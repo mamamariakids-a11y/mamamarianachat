@@ -1,13 +1,7 @@
 <%- include('../partials/header') %>
 
 <div class="page-actions">
-  <a href="/director" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-right"></i> رجوع للتقويم</a>
-  <div class="gap-8">
-    <a href="/director/items/<%= item.id %>/edit" class="btn btn-secondary btn-sm"><i class="fa-solid fa-pen"></i> تعديل</a>
-    <form method="POST" action="/director/items/<%= item.id %>/delete" onsubmit="return confirm('هل أنت متأكدة من حذف هذا الدرس/النشاط؟');">
-      <button type="submit" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i> حذف</button>
-    </form>
-  </div>
+  <a href="/teacher" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-right"></i> رجوع للجدول</a>
 </div>
 
 <div class="card mt-0">
@@ -21,7 +15,6 @@
 
   <div class="meta-row">
     <span class="m-item"><i class="fa-regular fa-calendar"></i> <%= dayjs(item.scheduled_date).format('dddd DD MMMM YYYY') %></span>
-    <span class="m-item"><i class="fa-regular fa-clock"></i> أُنشئ في <%= dayjs(item.created_at).format('DD/MM/YYYY') %></span>
   </div>
 
   <% if (item.description) { %>
@@ -38,7 +31,7 @@
   <% } %>
 
   <% if (item.attachments && item.attachments.length) { %>
-    <div class="section-title">المرفقات</div>
+    <div class="section-title">المرفقات من المديرة التربوية</div>
     <div class="attach-list">
       <% item.attachments.forEach(function(a) { %>
         <a class="attach-chip" href="data:<%= a.mime %>;base64,<%= a.data %>" download="<%= a.name %>" target="_blank"><i class="fa-solid fa-paperclip"></i> <%= a.name %></a>
@@ -47,45 +40,51 @@
   <% } %>
 </div>
 
-<div class="card">
-  <div class="card-title">متابعة الفصول</div>
-  <div class="card-sub">حالة الاستلام والتنفيذ لكل فصل تم تعيينه</div>
-
-  <% assignments.forEach(function(a) { %>
-    <div class="assign-row">
-      <div class="a-left">
-        <span class="class-dot" style="background: <%= a.class_color %>;"></span>
-        <div>
-          <div style="font-weight:700;"><%= a.class_name %></div>
-          <% if (a.status === 'received') { %>
-            <div class="text-muted" style="font-size:12px;">استلمته <%= a.received_by_name %> - <%= dayjs(a.received_at).format('DD/MM HH:mm') %></div>
-          <% } else if (a.status === 'executed') { %>
-            <div class="text-muted" style="font-size:12px;">نفّذته <%= a.executed_by_name %> - <%= dayjs(a.executed_at).format('DD/MM HH:mm') %></div>
-          <% } %>
-        </div>
-      </div>
-      <span class="badge badge-<%= a.status %>">
-        <span class="badge-dot"></span>
-        <%= {pending: 'بانتظار الاستلام', received: 'تم الاستلام', executed: 'تم التنفيذ'}[a.status] %>
-      </span>
+<% assignments.forEach(function(a) { %>
+  <div class="card">
+    <div class="flex-between" style="margin-bottom: 14px;">
+      <div class="card-title mt-0" style="margin-bottom:0;"><%= a.class_name %></div>
+      <span class="badge badge-<%= a.status %>"><span class="badge-dot"></span> <%= {pending:'بانتظار الاستلام', received:'تم الاستلام', executed:'تم التنفيذ'}[a.status] %></span>
     </div>
-    <% if (a.status === 'executed' && (a.execution_notes || a.execution_photos.length)) { %>
-      <div class="card" style="background:#FBFCFE; box-shadow:none; margin-top:-4px; margin-bottom:14px;">
-        <% if (a.execution_notes) { %><p><%= a.execution_notes %></p><% } %>
-        <% if (a.execution_photos.length) { %>
-          <div class="photo-grid">
-            <% a.execution_photos.forEach(function(p) { %>
-              <a href="data:<%= p.mime %>;base64,<%= p.data %>" target="_blank"><img src="data:<%= p.mime %>;base64,<%= p.data %>" alt="صورة تنفيذ" /></a>
-            <% }) %>
-          </div>
-        <% } %>
-      </div>
-    <% } %>
-  <% }) %>
 
-  <% if (!assignments.length) { %>
-    <div class="empty-state"><p>لم يتم تعيين أي فصل بعد.</p></div>
-  <% } %>
-</div>
+    <% if (a.status === 'pending') { %>
+      <form method="POST" action="/teacher/items/<%= item.id %>/receive">
+        <input type="hidden" name="assignment_id" value="<%= a.id %>" />
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> تأكيد الاستلام</button>
+      </form>
+    <% } %>
+
+    <% if (a.status === 'received' || a.status === 'executed') { %>
+      <% if (a.status === 'received') { %>
+        <div class="alert alert-info">تم استلام هذا العنصر. بعد تنفيذه، أكّدي التنفيذ مع إضافة ملاحظات وصور إن أمكن.</div>
+      <% } %>
+      <form method="POST" action="/teacher/items/<%= item.id %>/execute" enctype="multipart/form-data">
+        <input type="hidden" name="assignment_id" value="<%= a.id %>" />
+        <div class="form-group">
+          <label class="field-label">ملاحظات التنفيذ<%= a.status === 'executed' ? ' (تحديث إضافي)' : '' %></label>
+          <textarea name="execution_notes" placeholder="كيف سار الدرس/النشاط؟ ملاحظات عن تفاعل الأطفال..."></textarea>
+        </div>
+        <div class="form-group mt-0">
+          <label class="field-label">صور من التنفيذ (اختياري)</label>
+          <input type="file" name="photos" multiple accept="image/*" />
+        </div>
+        <button type="submit" class="btn btn-success"><i class="fa-solid fa-camera"></i> <%= a.status === 'executed' ? 'إضافة تحديث' : 'تأكيد التنفيذ' %></button>
+      </form>
+    <% } %>
+
+    <% if (a.status === 'executed' && (a.execution_notes || a.execution_photos.length)) { %>
+      <div class="divider"></div>
+      <div class="section-title" style="margin-top:0;">آخر تحديث للتنفيذ</div>
+      <% if (a.execution_notes) { %><p><%= a.execution_notes %></p><% } %>
+      <% if (a.execution_photos.length) { %>
+        <div class="photo-grid">
+          <% a.execution_photos.forEach(function(p) { %>
+            <a href="data:<%= p.mime %>;base64,<%= p.data %>" target="_blank"><img src="data:<%= p.mime %>;base64,<%= p.data %>" alt="صورة تنفيذ" /></a>
+          <% }) %>
+        </div>
+      <% } %>
+    <% } %>
+  </div>
+<% }) %>
 
 <%- include('../partials/footer') %>

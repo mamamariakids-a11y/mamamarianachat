@@ -2,12 +2,23 @@
 
 <div class="page-actions">
   <div>
-    <h1>التقويم التربوي</h1>
-    <div class="sub">إدارة الدروس والأنشطة الأسبوعية والشهرية لجميع الفصول</div>
+    <h1>جدولي الأسبوعي</h1>
+    <div class="sub">الدروس والأنشطة المرسلة من المديرة التربوية لفصلك</div>
   </div>
-  <a href="/director/items/new" class="btn btn-primary"><i class="fa-solid fa-circle-plus"></i> إنشاء درس/نشاط جديد</a>
+  <% if (pendingCount > 0) { %>
+    <span class="badge badge-pending" style="font-size:13px; padding:8px 16px;"><i class="fa-solid fa-circle-exclamation"></i> لديك <%= pendingCount %> بانتظار الاستلام</span>
+  <% } %>
 </div>
 
+<% if (!hasClass) { %>
+  <div class="card">
+    <div class="empty-state">
+      <div class="es-icon">🏫</div>
+      <h3>لم يتم تعيين فصل لحسابك بعد</h3>
+      <p>يرجى التواصل مع إدارة الروضة لربط حسابك بأحد الفصول.</p>
+    </div>
+  </div>
+<% } else { %>
 <div class="card">
   <div class="calendar-toolbar">
     <div class="calendar-nav">
@@ -33,17 +44,15 @@
           <div class="day-empty">لا يوجد</div>
         <% } %>
         <% day.items.forEach(function(it) { %>
-          <a class="day-item type-<%= it.type %>" href="/director/items/<%= it.id %>">
+          <a class="day-item type-<%= it.type %>" href="/teacher/items/<%= it.id %>">
             <%= it.title %>
-            <span class="di-status">
-              <%= it.class_names || 'بدون فصل' %> ·
-              <%= it.executed_count == it.assignment_count && it.assignment_count > 0 ? 'تم التنفيذ بالكامل' : (it.min_status === 'pending' ? 'بانتظار الاستلام' : 'قيد المتابعة') %>
-            </span>
+            <span class="di-status"><%= {pending:'بانتظار الاستلام', received:'تم الاستلام', executed:'تم التنفيذ'}[it.my_status] %></span>
           </a>
         <% }) %>
       </div>
     <% }) %>
   </div>
 </div>
+<% } %>
 
 <%- include('../partials/footer') %>
