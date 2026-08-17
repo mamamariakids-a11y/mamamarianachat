@@ -10,9 +10,11 @@ router.get('/change-password', (req, res) => {
   res.render('account/change-password', { title: 'تغيير كلمة المرور', error: null, success: null });
 });
 
-router.post('/change-password', (req, res) => {
+router.post('/change-password', async (req, res, next) => {
+ try {
   const { current_password, new_password, confirm_password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.user.id);
+  const result = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [req.session.user.id] });
+  const user = result.rows[0];
 
   if (!current_password || !bcrypt.compareSync(current_password, user.password_hash)) {
     return res.status(400).render('account/change-password', {
@@ -36,8 +38,11 @@ router.post('/change-password', (req, res) => {
     });
   }
 
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(new_password, 10), user.id);
+  await db.execute({ sql: 'UPDATE users SET password_hash = ? WHERE id = ?', args: [bcrypt.hashSync(new_password, 10), user.id] });
   res.render('account/change-password', { title: 'تغيير كلمة المرور', error: null, success: 'تم تغيير كلمة المرور بنجاح.' });
+ } catch (err) {
+   next(err);
+ }
 });
 
 module.exports = router;

@@ -1,31 +1,40 @@
 const path = require('path');
 const fs = require('fs');
-const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 const { seedIfEmpty } = require('./seed-data');
 
-// DATA_DIR lets you point the database (and, via utils/upload.js, uploaded
-// files) at a persistent disk when deploying to a host with an otherwise
-// ephemeral filesystem (e.g. Render's mounted Disk). Locally it just
-// defaults to this db/ folder, so nothing changes for local development.
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-
-const DB_PATH = path.join(DATA_DIR, 'mamamaria.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+// Two ways to run this app, using the exact same code:
+//
+// 1) Locally / no setup: leave TURSO_DATABASE_URL unset and the app stores
+//    everything in a local file (db/mamamaria.db) — nothing to configure.
+// 2) Deployed (e.g. on Render's free tier): set TURSO_DATABASE_URL and
+//    TURSO_AUTH_TOKEN to a free https://turso.tech database. This makes the
+//    data persist reliably even though the host's own filesystem is wiped
+//    on every restart/redeploy — no paid disk needed.
+const LOCAL_DB_PATH = path.join(__dirname, 'mamamaria.db');
+const url = process.env.TURSO_DATABASE_URL || `file:${LOCAL_DB_PATH}`;
+const authToken = process.env.TURSO_AUTH_TOKEN || undefined;
 
-const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-db.exec(schema);
+const db = createClient({ url, authToken });
 
-// Auto-seed on first boot so a fresh deployment is immediately usable
-// without needing shell access to run `npm run seed` manually.
-const didSeed = seedIfEmpty(db);
-if (didSeed) {
-  console.log('تمت تعبئة قاعدة البيانات ببيانات أولية تلقائيًا (أول تشغيل).');
+async function init() {
+  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  await db.executeMultiple(schema);
+  try {
+    await db.execute('PRAGMA foreign_keys = ON');
+  } catch (e) {
+    // Not critical if the underlying engine ignores this pragma.
+  }
+
+  const didSeed = await seedIfEmpty(db);
+  if (didSeed) {
+    console.log('تمت تعبئة قاعدة البيانات ببيانات أولية تلقائيًا (أول تشغيل).');
+  }
 }
 
+// Exposed so app.js/db/seed.js can wait for schema+seed before serving requests.
+db.ready = init();
+
 module.exports = db;
-module.exports.DATA_DIR = DATA_DIR;

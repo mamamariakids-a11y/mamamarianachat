@@ -4,18 +4,23 @@
 const db = require('./index');
 const { seedIfEmpty } = require('./seed-data');
 
-const didSeed = seedIfEmpty(db);
+(async () => {
+  await db.ready; // wait for schema to be created first
 
-if (!didSeed) {
-  console.log('قاعدة البيانات تحتوي بيانات بالفعل، تم تخطي التعبئة الأولية.');
-} else {
-  console.log('تمت تعبئة قاعدة البيانات بالبيانات الأولية بنجاح.');
-}
+  const didSeed = await seedIfEmpty(db);
 
-console.log('---------------------------------------------');
-console.log('مديرة الروضة : mama.mariakids@gmail.com / Admin@2026');
-console.log('المديرة التربوية : director@mamamaria.test / Director@123');
-console.log('مربية (فصل البراعم) : teacher1@mamamaria.test / Teacher@123');
-console.log('مربية (فصل الفراشات) : teacher2@mamamaria.test / Teacher@123');
-console.log('ولي أمر : parent1@mamamaria.test / Parent@123');
-console.log('---------------------------------------------');
+  if (!didSeed) {
+    console.log('قاعدة البيانات تحتوي بيانات بالفعل، تم تخطي التعبئة الأولية.');
+  } else {
+    console.log('تمت تعبئة قاعدة البيانات بالبيانات الأولية بنجاح.');
+  }
+
+  console.log('---------------------------------------------');
+  console.log('مديرة الروضة : mama.mariakids@gmail.com / Admin@2026');
+  console.log('المديرة التربوية : director@mamamaria.test / Director@123');
+  console.log('مربية (فصل البراعم) : teacher1@mamamaria.test / Teacher@123');
+  console.log('مربية (فصل الفراشات) : teacher2@mamamaria.test / Teacher@123');
+  console.log('ولي أمر : parent1@mamamaria.test / Parent@123');
+  console.log('---------------------------------------------');
+  process.exit(0);
+})();

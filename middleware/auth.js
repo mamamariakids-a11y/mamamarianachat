@@ -23,12 +23,23 @@ function requireRole(...roles) {
 
 // Makes the logged-in user + unread notification count available to every view
 function attachUser(db) {
-  const countStmt = db.prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0');
-  return (req, res, next) => {
-    res.locals.user = req.session.user || null;
-    res.locals.unreadCount = req.session.user ? countStmt.get(req.session.user.id).c : 0;
-    res.locals.currentPath = req.path;
-    next();
+  return async (req, res, next) => {
+    try {
+      res.locals.user = req.session.user || null;
+      res.locals.currentPath = req.path;
+      if (req.session.user) {
+        const result = await db.execute({
+          sql: 'SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0',
+          args: [req.session.user.id],
+        });
+        res.locals.unreadCount = Number(result.rows[0].c);
+      } else {
+        res.locals.unreadCount = 0;
+      }
+      next();
+    } catch (err) {
+      next(err);
+    }
   };
 }
 

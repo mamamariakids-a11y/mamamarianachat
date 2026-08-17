@@ -1,31 +1,14 @@
 const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 const multer = require('multer');
 
-// Same DATA_DIR convention as db/index.js: defaults to public/uploads for
-// local development, but can be pointed at a mounted persistent disk in
-// production (see README "النشر" section).
-const UPLOAD_DIR = process.env.DATA_DIR
-  ? path.join(path.resolve(process.env.DATA_DIR), 'uploads')
-  : path.join(__dirname, '..', 'public', 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const safeBase = path
-      .basename(file.originalname, ext)
-      .replace(/[^a-zA-Z0-9؀-ۿ_-]/g, '_')
-      .slice(0, 40);
-    const unique = crypto.randomBytes(6).toString('hex');
-    cb(null, `${Date.now()}-${unique}-${safeBase}${ext}`);
-  },
-});
-
+// Files are kept in memory (never written to disk) and the route handlers
+// convert them to base64 and store them directly inside the database row
+// (see routes/director.js and routes/teacher.js). This means there is no
+// local/persistent-disk dependency at all for uploads — everything lives in
+// the same place as the rest of the data (Turso in production, or the local
+// SQLite file during development).
 const ALLOWED = new Set([
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.mp4', '.mp3',
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx', '.ppt', '.pptx',
 ]);
 
 function fileFilter(req, file, cb) {
@@ -35,10 +18,24 @@ function fileFilter(req, file, cb) {
 }
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
-  limits: { fileSize: 15 * 1024 * 1024, files: 8 },
+  // Kept modest since files are stored as base64 text inside the database
+  // (free database tiers have a total storage budget, not per-file).
+  limits: { fileSize: 4 * 1024 * 1024, files: 8 },
 });
 
+// Converts a multer in-memory file into the {name, mime, size, data} shape
+// stored in items.attachments / item_assignments.execution_photos.
+function fileToRecord(file) {
+  return {
+    id: 'a' + Date.now() + Math.random().toString(36).slice(2, 8),
+    name: file.originalname,
+    mime: file.mimetype,
+    size: file.size,
+    data: file.buffer.toString('base64'),
+  };
+}
+
 module.exports = upload;
-module.exports.UPLOAD_DIR = UPLOAD_DIR;
+module.exports.fileToRecord = fileToRecord;

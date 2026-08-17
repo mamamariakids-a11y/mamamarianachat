@@ -47,7 +47,7 @@
             <% if (f.execution_photos.length) { %>
               <div class="photo-grid">
                 <% f.execution_photos.forEach(function(p) { %>
-                  <a href="/uploads/<%= p %>" target="_blank"><img src="/uploads/<%= p %>" alt="صورة النشاط" /></a>
+                  <a href="data:<%= p.mime %>;base64,<%= p.data %>" target="_blank"><img src="data:<%= p.mime %>;base64,<%= p.data %>" alt="صورة النشاط" /></a>
                 <% }) %>
               </div>
             <% } %>

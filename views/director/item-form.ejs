@@ -80,14 +80,14 @@
       <div class="form-group mt-0">
         <label class="field-label">إرفاق ملفات / صور (اختياري)</label>
         <input type="file" name="attachments" multiple accept="image/*,.pdf,.doc,.docx,.ppt,.pptx" />
-        <div class="form-hint file-label-text" data-default="بحد أقصى 8 ملفات، 15 ميجا لكل ملف">بحد أقصى 8 ملفات، 15 ميجا لكل ملف</div>
+        <div class="form-hint file-label-text" data-default="بحد أقصى 8 ملفات، 4 ميجا لكل ملف">بحد أقصى 8 ملفات، 4 ميجا لكل ملف</div>
 
         <% if (item && item.attachments && item.attachments.length) { %>
           <div class="attach-list">
             <% item.attachments.forEach(function(a) { %>
               <label class="attach-chip">
-                <input type="checkbox" name="remove_attachments" value="<%= a.filename %>" />
-                <i class="fa-solid fa-paperclip"></i> <%= a.original_name %> <span class="text-muted">(حذف)</span>
+                <input type="checkbox" name="remove_attachments" value="<%= a.id %>" />
+                <i class="fa-solid fa-paperclip"></i> <%= a.name %> <span class="text-muted">(حذف)</span>
               </label>
             <% }) %>
           </div>

@@ -5,18 +5,21 @@
 // on first boot (see db/index.js) as well as from the CLI (db/seed.js).
 const bcrypt = require('bcryptjs');
 
-function seedIfEmpty(db) {
-  const userCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+async function seedIfEmpty(db) {
+  const countResult = await db.execute('SELECT COUNT(*) AS c FROM users');
+  const userCount = Number(countResult.rows[0].c);
   if (userCount > 0) return false;
 
   const hash = (pwd) => bcrypt.hashSync(pwd, 10);
 
-  const insertUser = db.prepare(`
-    INSERT INTO users (name, email, password_hash, role, phone, avatar_color)
-    VALUES (@name, @email, @password_hash, @role, @phone, @avatar_color)
-  `);
+  const insertUser = (u) =>
+    db.execute({
+      sql: `INSERT INTO users (name, email, password_hash, role, phone, avatar_color)
+            VALUES (@name, @email, @password_hash, @role, @phone, @avatar_color)`,
+      args: u,
+    });
 
-  insertUser.run({
+  await insertUser({
     name: 'مديرة روضة ماما ماريا',
     email: 'mama.mariakids@gmail.com',
     password_hash: hash('Admin@2026'),
@@ -25,7 +28,7 @@ function seedIfEmpty(db) {
     avatar_color: '#B65C9E',
   });
 
-  insertUser.run({
+  await insertUser({
     name: 'أ. سارة أحمد',
     email: 'director@mamamaria.test',
     password_hash: hash('Director@123'),
@@ -34,7 +37,7 @@ function seedIfEmpty(db) {
     avatar_color: '#4A7CE0',
   });
 
-  const teacher1 = insertUser.run({
+  const teacher1 = await insertUser({
     name: 'أ. منى خالد',
     email: 'teacher1@mamamaria.test',
     password_hash: hash('Teacher@123'),
@@ -43,7 +46,7 @@ function seedIfEmpty(db) {
     avatar_color: '#3AA0A0',
   });
 
-  const teacher2 = insertUser.run({
+  const teacher2 = await insertUser({
     name: 'أ. ريم سالم',
     email: 'teacher2@mamamaria.test',
     password_hash: hash('Teacher@123'),
@@ -52,7 +55,7 @@ function seedIfEmpty(db) {
     avatar_color: '#E0A23A',
   });
 
-  const parent1 = insertUser.run({
+  const parent1 = await insertUser({
     name: 'ولي أمر - أحمد محمد',
     email: 'parent1@mamamaria.test',
     password_hash: hash('Parent@123'),
@@ -61,30 +64,34 @@ function seedIfEmpty(db) {
     avatar_color: '#7A5CB6',
   });
 
-  const insertClass = db.prepare(`
-    INSERT INTO classes (name, age_range, teacher_id, color) VALUES (@name, @age_range, @teacher_id, @color)
-  `);
+  const insertClass = (c) =>
+    db.execute({
+      sql: `INSERT INTO classes (name, age_range, teacher_id, color) VALUES (@name, @age_range, @teacher_id, @color)`,
+      args: c,
+    });
 
-  const classA = insertClass.run({
+  const classA = await insertClass({
     name: 'فصل البراعم',
     age_range: '3-4 سنوات',
-    teacher_id: teacher1.lastInsertRowid,
+    teacher_id: Number(teacher1.lastInsertRowid),
     color: '#3AA0A0',
   });
 
-  const classB = insertClass.run({
+  const classB = await insertClass({
     name: 'فصل الفراشات',
     age_range: '4-5 سنوات',
-    teacher_id: teacher2.lastInsertRowid,
+    teacher_id: Number(teacher2.lastInsertRowid),
     color: '#E0A23A',
   });
 
-  const insertChild = db.prepare(`
-    INSERT INTO children (name, class_id, parent_id) VALUES (@name, @class_id, @parent_id)
-  `);
+  const insertChild = (c) =>
+    db.execute({
+      sql: `INSERT INTO children (name, class_id, parent_id) VALUES (@name, @class_id, @parent_id)`,
+      args: c,
+    });
 
-  insertChild.run({ name: 'يوسف أحمد', class_id: classA.lastInsertRowid, parent_id: parent1.lastInsertRowid });
-  insertChild.run({ name: 'لجين سالم', class_id: classB.lastInsertRowid, parent_id: null });
+  await insertChild({ name: 'يوسف أحمد', class_id: Number(classA.lastInsertRowid), parent_id: Number(parent1.lastInsertRowid) });
+  await insertChild({ name: 'لجين سالم', class_id: Number(classB.lastInsertRowid), parent_id: null });
 
   return true;
 }

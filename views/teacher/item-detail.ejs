@@ -34,7 +34,7 @@
     <div class="section-title">المرفقات من المديرة التربوية</div>
     <div class="attach-list">
       <% item.attachments.forEach(function(a) { %>
-        <a class="attach-chip" href="/uploads/<%= a.filename %>" target="_blank"><i class="fa-solid fa-paperclip"></i> <%= a.original_name %></a>
+        <a class="attach-chip" href="data:<%= a.mime %>;base64,<%= a.data %>" download="<%= a.name %>" target="_blank"><i class="fa-solid fa-paperclip"></i> <%= a.name %></a>
       <% }) %>
     </div>
   <% } %>
@@ -79,7 +79,7 @@
       <% if (a.execution_photos.length) { %>
         <div class="photo-grid">
           <% a.execution_photos.forEach(function(p) { %>
-            <a href="/uploads/<%= p %>" target="_blank"><img src="/uploads/<%= p %>" alt="صورة تنفيذ" /></a>
+            <a href="data:<%= p.mime %>;base64,<%= p.data %>" target="_blank"><img src="data:<%= p.mime %>;base64,<%= p.data %>" alt="صورة تنفيذ" /></a>
           <% }) %>
         </div>
       <% } %>

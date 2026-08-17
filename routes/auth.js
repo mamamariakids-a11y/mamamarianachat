@@ -16,9 +16,14 @@ router.get('/login', (req, res) => {
   res.render('auth/login', { error: null, layout: false });
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res, next) => {
+  try {
   const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ? AND active = 1').get((email || '').trim().toLowerCase());
+  const result = await db.execute({
+    sql: 'SELECT * FROM users WHERE email = ? AND active = 1',
+    args: [(email || '').trim().toLowerCase()],
+  });
+  const user = result.rows[0];
 
   if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
     return res.status(401).render('auth/login', {
@@ -36,6 +41,9 @@ router.post('/login', (req, res) => {
   };
 
   res.redirect(ROLE_HOME[user.role] || '/');
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/logout', (req, res) => {
