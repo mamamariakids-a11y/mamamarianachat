@@ -1,0 +1,90 @@
+<%- include('../partials/header') %>
+
+<div class="page-actions">
+  <a href="/teacher" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-right"></i> رجوع للجدول</a>
+</div>
+
+<div class="card mt-0">
+  <div class="detail-header">
+    <div>
+      <span class="badge badge-<%= item.type %>"><%= item.type === 'activity' ? '🎨 نشاط' : '📘 درس' %></span>
+      <span class="badge badge-<%= item.priority %>"><%= {normal:'عادية', important:'مهمة', urgent:'عاجلة'}[item.priority] %></span>
+      <h1 style="margin-top:10px;"><%= item.title %></h1>
+    </div>
+  </div>
+
+  <div class="meta-row">
+    <span class="m-item"><i class="fa-regular fa-calendar"></i> <%= dayjs(item.scheduled_date).format('dddd DD MMMM YYYY') %></span>
+  </div>
+
+  <% if (item.description) { %>
+    <div class="section-title">الوصف</div>
+    <p><%= item.description %></p>
+  <% } %>
+  <% if (item.objective) { %>
+    <div class="section-title">الهدف التربوي</div>
+    <p><%= item.objective %></p>
+  <% } %>
+  <% if (item.materials) { %>
+    <div class="section-title">المواد المطلوبة</div>
+    <p><%= item.materials %></p>
+  <% } %>
+
+  <% if (item.attachments && item.attachments.length) { %>
+    <div class="section-title">المرفقات من المديرة التربوية</div>
+    <div class="attach-list">
+      <% item.attachments.forEach(function(a) { %>
+        <a class="attach-chip" href="/uploads/<%= a.filename %>" target="_blank"><i class="fa-solid fa-paperclip"></i> <%= a.original_name %></a>
+      <% }) %>
+    </div>
+  <% } %>
+</div>
+
+<% assignments.forEach(function(a) { %>
+  <div class="card">
+    <div class="flex-between" style="margin-bottom: 14px;">
+      <div class="card-title mt-0" style="margin-bottom:0;"><%= a.class_name %></div>
+      <span class="badge badge-<%= a.status %>"><span class="badge-dot"></span> <%= {pending:'بانتظار الاستلام', received:'تم الاستلام', executed:'تم التنفيذ'}[a.status] %></span>
+    </div>
+
+    <% if (a.status === 'pending') { %>
+      <form method="POST" action="/teacher/items/<%= item.id %>/receive">
+        <input type="hidden" name="assignment_id" value="<%= a.id %>" />
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> تأكيد الاستلام</button>
+      </form>
+    <% } %>
+
+    <% if (a.status === 'received' || a.status === 'executed') { %>
+      <% if (a.status === 'received') { %>
+        <div class="alert alert-info">تم استلام هذا العنصر. بعد تنفيذه، أكّدي التنفيذ مع إضافة ملاحظات وصور إن أمكن.</div>
+      <% } %>
+      <form method="POST" action="/teacher/items/<%= item.id %>/execute" enctype="multipart/form-data">
+        <input type="hidden" name="assignment_id" value="<%= a.id %>" />
+        <div class="form-group">
+          <label class="field-label">ملاحظات التنفيذ<%= a.status === 'executed' ? ' (تحديث إضافي)' : '' %></label>
+          <textarea name="execution_notes" placeholder="كيف سار الدرس/النشاط؟ ملاحظات عن تفاعل الأطفال..."></textarea>
+        </div>
+        <div class="form-group mt-0">
+          <label class="field-label">صور من التنفيذ (اختياري)</label>
+          <input type="file" name="photos" multiple accept="image/*" />
+        </div>
+        <button type="submit" class="btn btn-success"><i class="fa-solid fa-camera"></i> <%= a.status === 'executed' ? 'إضافة تحديث' : 'تأكيد التنفيذ' %></button>
+      </form>
+    <% } %>
+
+    <% if (a.status === 'executed' && (a.execution_notes || a.execution_photos.length)) { %>
+      <div class="divider"></div>
+      <div class="section-title" style="margin-top:0;">آخر تحديث للتنفيذ</div>
+      <% if (a.execution_notes) { %><p><%= a.execution_notes %></p><% } %>
+      <% if (a.execution_photos.length) { %>
+        <div class="photo-grid">
+          <% a.execution_photos.forEach(function(p) { %>
+            <a href="/uploads/<%= p %>" target="_blank"><img src="/uploads/<%= p %>" alt="صورة تنفيذ" /></a>
+          <% }) %>
+        </div>
+      <% } %>
+    <% } %>
+  </div>
+<% }) %>
+
+<%- include('../partials/footer') %>

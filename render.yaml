@@ -1,0 +1,22 @@
+# Render Blueprint — يقرأ Render هذا الملف تلقائيًا عند اختيار "New +" -> "Blueprint"
+# وربط هذا المستودع، وينشئ الخدمة + القرص الدائم + المتغيرات دفعة واحدة
+# دون أي إعداد يدوي إضافي.
+services:
+  - type: web
+    name: mamamaria-kindergarten
+    env: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    disk:
+      name: mamamaria-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: SESSION_SECRET
+        generateValue: true
