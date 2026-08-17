@@ -327,6 +327,124 @@ router.post('/attendance', async (req, res, next) => {
   }
 });
 
+// ---------- Daily report (meals / nap / mood / bathroom) ----------
+router.get('/daily-report', async (req, res, next) => {
+  try {
+    const classes = await myClasses(req.session.user.id);
+    if (!classes.length) {
+      return res.render('teacher/daily-report', {
+        title: 'التقرير اليومي',
+        classes: [],
+        activeClass: null,
+        date: dayjs().format('YYYY-MM-DD'),
+        children: [],
+      });
+    }
+
+    const requestedClassId = Number(req.query.class_id) || classes[0].id;
+    const activeClass = classes.find((c) => c.id === requestedClassId) || classes[0];
+    const date = req.query.date && dayjs(req.query.date).isValid() ? req.query.date : dayjs().format('YYYY-MM-DD');
+
+    const childrenResult = await db.execute({
+      sql: 'SELECT id, name FROM children WHERE class_id = ? ORDER BY name',
+      args: [activeClass.id],
+    });
+
+    const reportsResult = await db.execute({
+      sql: 'SELECT * FROM daily_reports WHERE class_id = ? AND date = ?',
+      args: [activeClass.id, date],
+    });
+    const reportMap = {};
+    reportsResult.rows.forEach((r) => { reportMap[r.child_id] = r; });
+
+    const children = childrenResult.rows.map((c) => ({ ...c, report: reportMap[c.id] || null }));
+    const filledCount = children.filter((c) => c.report).length;
+
+    res.render('teacher/daily-report', {
+      title: 'التقرير اليومي',
+      classes,
+      activeClass,
+      date,
+      children,
+      filledCount,
+      isToday: date === dayjs().format('YYYY-MM-DD'),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/daily-report', async (req, res, next) => {
+  try {
+    const classes = await myClasses(req.session.user.id);
+    const classId = Number(req.body.class_id);
+    if (!classes.some((c) => c.id === classId)) {
+      return res.status(403).render('error', { title: 'غير مصرح', message: 'هذا الفصل ليس فصلك.' });
+    }
+    const date = req.body.date && dayjs(req.body.date).isValid() ? req.body.date : dayjs().format('YYYY-MM-DD');
+
+    const childrenResult = await db.execute({ sql: 'SELECT id FROM children WHERE class_id = ?', args: [classId] });
+
+    for (const child of childrenResult.rows) {
+      const mealStatus = ['all', 'some', 'none'].includes(req.body[`meal_${child.id}`]) ? req.body[`meal_${child.id}`] : null;
+      const napStatus = ['yes', 'no'].includes(req.body[`nap_${child.id}`]) ? req.body[`nap_${child.id}`] : null;
+      const napMinutesRaw = req.body[`nap_minutes_${child.id}`];
+      const napMinutes = napMinutesRaw && Number(napMinutesRaw) >= 0 ? Number(napMinutesRaw) : null;
+      const mood = ['happy', 'normal', 'tired', 'upset'].includes(req.body[`mood_${child.id}`]) ? req.body[`mood_${child.id}`] : null;
+      const bathroomRaw = req.body[`bathroom_${child.id}`];
+      const bathroomCount = bathroomRaw && Number(bathroomRaw) >= 0 ? Number(bathroomRaw) : null;
+      const notes = (req.body[`notes_${child.id}`] || '').trim() || null;
+
+      // Skip children the teacher left entirely blank — avoids creating an
+      // empty row just because the form was submitted with all fields empty.
+      if (!mealStatus && !napStatus && napMinutes === null && !mood && bathroomCount === null && !notes) continue;
+
+      // eslint-disable-next-line no-await-in-loop
+      await db.execute({
+        sql: `INSERT INTO daily_reports (child_id, class_id, date, meal_status, nap_status, nap_minutes, mood, bathroom_count, notes, created_by)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(child_id, date) DO UPDATE SET
+                meal_status = excluded.meal_status, nap_status = excluded.nap_status, nap_minutes = excluded.nap_minutes,
+                mood = excluded.mood, bathroom_count = excluded.bathroom_count, notes = excluded.notes,
+                created_by = excluded.created_by, updated_at = datetime('now')`,
+        args: [child.id, classId, date, mealStatus, napStatus, napMinutes, mood, bathroomCount, notes, req.session.user.id],
+      });
+    }
+
+    res.redirect(`/teacher/daily-report?class_id=${classId}&date=${date}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Health record (read-only for teachers) ----------
+router.get('/children/:id/health', async (req, res, next) => {
+  try {
+    const classIds = await myClassIds(req.session.user.id);
+    const childResult = await db.execute({
+      sql: `SELECT children.*, classes.name AS class_name FROM children
+            LEFT JOIN classes ON classes.id = children.class_id WHERE children.id = ?`,
+      args: [req.params.id],
+    });
+    const child = childResult.rows[0];
+    if (!child || !classIds.includes(child.class_id)) {
+      return res.status(403).render('error', { title: 'غير مصرح', message: 'هذا الطفل ليس في فصلك.' });
+    }
+
+    const healthResult = await db.execute({ sql: 'SELECT * FROM health_profiles WHERE child_id = ?', args: [child.id] });
+    const contactsResult = await db.execute({ sql: 'SELECT * FROM emergency_contacts WHERE child_id = ? ORDER BY id', args: [child.id] });
+
+    res.render('teacher/health', {
+      title: `السجل الصحي - ${child.name}`,
+      child,
+      healthProfile: healthResult.rows[0] || null,
+      contacts: contactsResult.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ---------- Parent notes ----------
 router.get('/notes', async (req, res, next) => {
   try {

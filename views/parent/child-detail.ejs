@@ -1,0 +1,20 @@
+<%- include('../partials/header') %>
+
+<div class="page-actions">
+  <div>
+    <h1><%= child.name %></h1>
+    <div class="sub"><%= child.class_name || 'بدون فصل حاليًا' %> · السجل الصحي وجهات الطوارئ</div>
+  </div>
+  <a href="/parent" class="btn btn-secondary"><i class="fa-solid fa-arrow-right"></i> عودة لأنشطة طفلي</a>
+</div>
+
+<div class="card mt-0">
+  <p class="text-muted" style="line-height:1.8;">
+    يمكنك تحديث السجل الصحي لطفلك (الحساسية، الأدوية، الأمراض المزمنة) وإضافة جهات اتصال يُسمح لها باستلامه في حالات الطوارئ.
+    تظهر هذه البيانات لإدارة الروضة والمربية لضمان سلامة طفلك.
+  </p>
+</div>
+
+<%- include('../partials/health-record', { healthProfile, contacts, editable, actionPrefix }) %>
+
+<%- include('../partials/footer') %>

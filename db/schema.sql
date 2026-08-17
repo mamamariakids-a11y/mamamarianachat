@@ -119,6 +119,52 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Daily per-child report filled by the teacher: meals, nap, mood, bathroom —
+-- visible to the parent, one row per child per day.
+CREATE TABLE IF NOT EXISTS daily_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  meal_status TEXT CHECK (meal_status IN ('all','some','none')),
+  nap_status TEXT CHECK (nap_status IN ('yes','no')),
+  nap_minutes INTEGER,
+  mood TEXT CHECK (mood IN ('happy','normal','tired','upset')),
+  bathroom_count INTEGER,
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(child_id, date)
+);
+
+-- Permanent health profile per child (blood type, allergies, chronic
+-- conditions, medications, doctor info). Editable by admin/director/staff
+-- and by the child's own parent; read-only for the child's teacher.
+CREATE TABLE IF NOT EXISTS health_profiles (
+  child_id INTEGER PRIMARY KEY REFERENCES children(id) ON DELETE CASCADE,
+  blood_type TEXT,
+  allergies TEXT,
+  chronic_conditions TEXT,
+  medications TEXT,
+  doctor_name TEXT,
+  doctor_phone TEXT,
+  notes TEXT,
+  updated_by INTEGER REFERENCES users(id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Emergency contacts / authorized-pickup list per child.
+CREATE TABLE IF NOT EXISTS emergency_contacts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  relation TEXT,
+  phone TEXT NOT NULL,
+  can_pickup INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_items_date ON items(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_assignments_class ON item_assignments(class_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_item ON item_assignments(item_id);
@@ -130,3 +176,6 @@ CREATE INDEX IF NOT EXISTS idx_notes_class ON parent_notes(class_id, archived);
 CREATE INDEX IF NOT EXISTS idx_notes_child ON parent_notes(child_id);
 CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
 CREATE INDEX IF NOT EXISTS idx_notes_date ON parent_notes(note_date);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_date ON daily_reports(date);
+CREATE INDEX IF NOT EXISTS idx_daily_reports_child ON daily_reports(child_id);
+CREATE INDEX IF NOT EXISTS idx_emergency_contacts_child ON emergency_contacts(child_id);

@@ -53,6 +53,7 @@
         <div class="assign-row">
           <div class="a-left">
             <div style="font-weight:700;"><%= c.name %></div>
+            <a href="/teacher/children/<%= c.id %>/health" class="btn btn-secondary btn-sm" title="السجل الصحي"><i class="fa-solid fa-notes-medical"></i></a>
           </div>
           <div class="radio-row att-radio">
             <label><input type="radio" name="status_<%= c.id %>" value="present" <%= c.status === 'present' ? 'checked' : '' %> /><span class="att-present">✅ حاضر</span></label>

@@ -8,6 +8,7 @@ const { requireRole } = require('../middleware/auth');
 const { uploadImportFile, parseImportFile, randomPassword } = require('../utils/importChildren');
 const { buildBackupWorkbook } = require('../utils/exportBackup');
 const { buildMonthlyReportPdf, getMonthlyReportData } = require('../utils/monthlyReport');
+const { MEAL_LABELS, NAP_LABELS, MOOD_LABELS } = require('../utils/dailyReportLabels');
 
 // Loaded once and reused for every report — avoids re-reading the file from
 // disk on each request.
@@ -249,6 +250,98 @@ router.post('/children/:id/delete', async (req, res, next) => {
   }
 });
 
+// ---------- Child detail: basic info + health record + emergency contacts ----------
+async function loadChildDetail(childId) {
+  const childResult = await db.execute({
+    sql: `SELECT children.*, classes.name AS class_name, users.name AS parent_name
+          FROM children LEFT JOIN classes ON classes.id = children.class_id
+          LEFT JOIN users ON users.id = children.parent_id WHERE children.id = ?`,
+    args: [childId],
+  });
+  const child = childResult.rows[0];
+  if (!child) return null;
+  const healthResult = await db.execute({ sql: 'SELECT * FROM health_profiles WHERE child_id = ?', args: [childId] });
+  const contactsResult = await db.execute({ sql: 'SELECT * FROM emergency_contacts WHERE child_id = ? ORDER BY id', args: [childId] });
+  return { child, healthProfile: healthResult.rows[0] || null, contacts: contactsResult.rows };
+}
+
+router.get('/children/:id', async (req, res, next) => {
+  try {
+    const detail = await loadChildDetail(req.params.id);
+    if (!detail) return res.status(404).render('error', { title: 'غير موجود', message: 'الطفل غير موجود.' });
+    const classesResult = await db.execute('SELECT * FROM classes ORDER BY name');
+    const parentsResult = await db.execute("SELECT * FROM users WHERE role='parent' AND active=1 ORDER BY name");
+    res.render('admin/child-detail', {
+      title: detail.child.name,
+      child: detail.child,
+      healthProfile: detail.healthProfile,
+      contacts: detail.contacts,
+      classes: classesResult.rows,
+      parents: parentsResult.rows,
+      editable: true,
+      actionPrefix: `/admin/children/${detail.child.id}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/children/:id', async (req, res, next) => {
+  try {
+    const { name, class_id, parent_id } = req.body;
+    if (!name) return res.redirect(`/admin/children/${req.params.id}`);
+    await db.execute({
+      sql: 'UPDATE children SET name=?, class_id=?, parent_id=? WHERE id=?',
+      args: [name, class_id || null, parent_id || null, req.params.id],
+    });
+    res.redirect(`/admin/children/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/children/:id/health', async (req, res, next) => {
+  try {
+    const { blood_type, allergies, chronic_conditions, medications, doctor_name, doctor_phone, notes } = req.body;
+    await db.execute({
+      sql: `INSERT INTO health_profiles (child_id, blood_type, allergies, chronic_conditions, medications, doctor_name, doctor_phone, notes, updated_by, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(child_id) DO UPDATE SET
+              blood_type=excluded.blood_type, allergies=excluded.allergies, chronic_conditions=excluded.chronic_conditions,
+              medications=excluded.medications, doctor_name=excluded.doctor_name, doctor_phone=excluded.doctor_phone,
+              notes=excluded.notes, updated_by=excluded.updated_by, updated_at=datetime('now')`,
+      args: [req.params.id, blood_type || null, allergies || null, chronic_conditions || null, medications || null, doctor_name || null, doctor_phone || null, notes || null, req.session.user.id],
+    });
+    res.redirect(`/admin/children/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/children/:id/contacts', async (req, res, next) => {
+  try {
+    const { name, relation, phone } = req.body;
+    if (name && phone) {
+      await db.execute({
+        sql: 'INSERT INTO emergency_contacts (child_id, name, relation, phone, can_pickup) VALUES (?, ?, ?, ?, ?)',
+        args: [req.params.id, name.trim(), (relation || '').trim(), phone.trim(), req.body.can_pickup ? 1 : 0],
+      });
+    }
+    res.redirect(`/admin/children/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/children/:id/contacts/:contactId/delete', async (req, res, next) => {
+  try {
+    await db.execute({ sql: 'DELETE FROM emergency_contacts WHERE id = ? AND child_id = ?', args: [req.params.contactId, req.params.id] });
+    res.redirect(`/admin/children/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ---------- Bulk import of children (from Excel/CSV) ----------
 router.post('/children/import', (req, res, next) => {
   uploadImportFile.single('import_file')(req, res, async (uploadErr) => {
@@ -460,6 +553,52 @@ router.get('/attendance', async (req, res, next) => {
       nextDate: dayjs(date).add(1, 'day').format('YYYY-MM-DD'),
       classesToday,
       totals,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Daily report oversight ----------
+router.get('/daily-reports', async (req, res, next) => {
+  try {
+    const date = req.query.date && dayjs(req.query.date).isValid() ? req.query.date : dayjs().format('YYYY-MM-DD');
+
+    const rowsResult = await db.execute({
+      sql: `SELECT children.id AS child_id, children.name AS child_name,
+                   classes.id AS class_id, classes.name AS class_name, classes.color AS class_color,
+                   daily_reports.meal_status, daily_reports.nap_status, daily_reports.nap_minutes,
+                   daily_reports.mood, daily_reports.bathroom_count, daily_reports.notes
+            FROM children
+            JOIN classes ON classes.id = children.class_id
+            LEFT JOIN daily_reports ON daily_reports.child_id = children.id AND daily_reports.date = ?
+            ORDER BY classes.name, children.name`,
+      args: [date],
+    });
+
+    const classesMap = new Map();
+    rowsResult.rows.forEach((r) => {
+      if (!classesMap.has(r.class_id)) classesMap.set(r.class_id, { id: r.class_id, name: r.class_name, color: r.class_color, children: [], filled: 0 });
+      const cls = classesMap.get(r.class_id);
+      cls.children.push(r);
+      if (r.meal_status || r.nap_status || r.mood || r.bathroom_count !== null || r.notes) cls.filled += 1;
+    });
+    const classesToday = [...classesMap.values()];
+    const totalChildren = rowsResult.rows.length;
+    const totalFilled = classesToday.reduce((acc, c) => acc + c.filled, 0);
+
+    res.render('admin/daily-reports', {
+      title: 'التقرير اليومي للأطفال',
+      date,
+      isToday: date === dayjs().format('YYYY-MM-DD'),
+      prevDate: dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'),
+      nextDate: dayjs(date).add(1, 'day').format('YYYY-MM-DD'),
+      classesToday,
+      totalChildren,
+      totalFilled,
+      mealLabels: MEAL_LABELS,
+      napLabels: NAP_LABELS,
+      moodLabels: MOOD_LABELS,
     });
   } catch (err) {
     next(err);

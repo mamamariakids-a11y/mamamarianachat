@@ -16,11 +16,12 @@
         <tbody>
           <% children.forEach(function(c) { %>
             <tr>
-              <td><%= c.name %></td>
+              <td><a href="/admin/children/<%= c.id %>" style="font-weight:700; color:var(--color-primary-dark);"><%= c.name %></a></td>
               <td><%= c.class_name || '—' %></td>
               <td><%= c.parent_name || '—' %></td>
               <td>
-                <form method="POST" action="/admin/children/<%= c.id %>/delete" onsubmit="return confirm('حذف هذا الطفل؟');">
+                <a href="/admin/children/<%= c.id %>" class="btn btn-secondary btn-sm" title="السجل الصحي"><i class="fa-solid fa-notes-medical"></i></a>
+                <form method="POST" action="/admin/children/<%= c.id %>/delete" onsubmit="return confirm('حذف هذا الطفل؟');" style="display:inline;">
                   <button type="submit" class="btn btn-danger btn-sm"><i class="fa-solid fa-trash"></i></button>
                 </form>
               </td>
