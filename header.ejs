@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= typeof title !== 'undefined' ? title + ' | روضة ماما ماريا' : 'روضة ماما ماريا' %></title>
+  <link rel="icon" type="image/png" href="/images/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img class="logo-img" src="/images/logo.png" alt="شعار روضة ماما ماريا" />
+      <div>
+        <div class="name">روضة ماما ماريا</div>
+        <div class="sub">نظام إدارة الأنشطة التربوية</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <% if (user && user.role === 'admin') { %>
+        <div class="nav-section-title">الإدارة العامة</div>
+        <a class="nav-link <%= currentPath === '/admin' ? 'active' : '' %>" href="/admin"><span class="icon"><i class="fa-solid fa-gauge"></i></span> لوحة التحكم</a>
+        <a class="nav-link <%= currentPath === '/admin/users' ? 'active' : '' %>" href="/admin/users"><span class="icon"><i class="fa-solid fa-users"></i></span> المستخدمون</a>
+        <a class="nav-link <%= currentPath === '/admin/classes' ? 'active' : '' %>" href="/admin/classes"><span class="icon"><i class="fa-solid fa-chalkboard"></i></span> الفصول</a>
+        <a class="nav-link <%= currentPath === '/admin/children' ? 'active' : '' %>" href="/admin/children"><span class="icon"><i class="fa-solid fa-child-reaching"></i></span> الأطفال</a>
+        <a class="nav-link <%= currentPath === '/admin/attendance' ? 'active' : '' %>" href="/admin/attendance"><span class="icon"><i class="fa-solid fa-clipboard-check"></i></span> الحضور والغياب</a>
+        <div class="nav-section-title">الدروس والأنشطة</div>
+        <a class="nav-link <%= currentPath === '/director' ? 'active' : '' %>" href="/director"><span class="icon"><i class="fa-solid fa-calendar-days"></i></span> التقويم التربوي</a>
+        <a class="nav-link <%= currentPath === '/director/items/new' ? 'active' : '' %>" href="/director/items/new"><span class="icon"><i class="fa-solid fa-circle-plus"></i></span> إنشاء درس/نشاط</a>
+      <% } %>
+
+      <% if (user && user.role === 'director') { %>
+        <div class="nav-section-title">الدروس والأنشطة</div>
+        <a class="nav-link <%= currentPath === '/director' ? 'active' : '' %>" href="/director"><span class="icon"><i class="fa-solid fa-calendar-days"></i></span> التقويم التربوي</a>
+        <a class="nav-link <%= currentPath === '/director/items/new' ? 'active' : '' %>" href="/director/items/new"><span class="icon"><i class="fa-solid fa-circle-plus"></i></span> إنشاء درس/نشاط</a>
+      <% } %>
+
+      <% if (user && user.role === 'teacher') { %>
+        <div class="nav-section-title">مربيتي</div>
+        <a class="nav-link <%= currentPath === '/teacher' ? 'active' : '' %>" href="/teacher"><span class="icon"><i class="fa-solid fa-calendar-week"></i></span> جدولي الأسبوعي</a>
+        <a class="nav-link <%= currentPath === '/teacher/attendance' ? 'active' : '' %>" href="/teacher/attendance"><span class="icon"><i class="fa-solid fa-clipboard-check"></i></span> الحضور والغياب</a>
+      <% } %>
+
+      <% if (user && user.role === 'parent') { %>
+        <div class="nav-section-title">متابعة طفلي</div>
+        <a class="nav-link <%= currentPath === '/parent' ? 'active' : '' %>" href="/parent"><span class="icon"><i class="fa-solid fa-heart"></i></span> أنشطة طفلي</a>
+      <% } %>
+
+      <div class="nav-section-title">عام</div>
+      <a class="nav-link <%= currentPath === '/notifications' ? 'active' : '' %>" href="/notifications">
+        <span class="icon"><i class="fa-solid fa-bell"></i></span> الإشعارات
+        <% if (unreadCount > 0) { %><span class="badge-count"><%= unreadCount %></span><% } %>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <form action="/logout" method="POST">
+        <button type="submit"><i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج</button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="page-title"><%= typeof title !== 'undefined' ? title : '' %></div>
+      <div class="topbar-right">
+        <div class="bell-wrap">
+          <button class="bell-btn <%= unreadCount > 0 ? 'has-unread' : '' %>" id="bellBtn" type="button">
+            <i class="fa-solid fa-bell"></i>
+            <span class="dot"></span>
+          </button>
+          <div class="notif-dropdown" id="notifDropdown">
+            <div class="nd-header">الإشعارات</div>
+            <div id="notifList"><div class="notif-empty">جارٍ التحميل...</div></div>
+          </div>
+        </div>
+        <a href="/account/change-password" class="btn btn-secondary btn-sm" title="تغيير كلمة المرور"><i class="fa-solid fa-key"></i></a>
+        <div class="user-chip">
+          <div class="avatar" style="background: <%= user ? user.avatar_color : '#5B8DEF' %>"><%= user ? user.name.trim().charAt(0) : '' %></div>
+          <div class="meta">
+            <div class="u-name"><%= user ? user.name : '' %></div>
+            <div class="u-role">
+              <%
+                const roleLabels = { admin: 'مديرة الروضة', director: 'المديرة التربوية', teacher: 'مربية', parent: 'ولي أمر' };
+              %>
+              <%= user ? roleLabels[user.role] : '' %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="content">
