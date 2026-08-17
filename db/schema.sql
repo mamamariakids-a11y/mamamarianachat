@@ -105,6 +105,20 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- General kindergarten-wide events (holidays, trips, parent meetings,
+-- celebrations...) visible to every role, unlike `items` which are
+-- lessons/activities scoped to specific classes and only managed/seen by
+-- staff roles.
+CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  description TEXT,
+  event_date TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('holiday','trip','meeting','celebration','other')),
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_items_date ON items(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_assignments_class ON item_assignments(class_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_item ON item_assignments(item_id);
@@ -114,4 +128,5 @@ CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON attendance(class_id, dat
 CREATE INDEX IF NOT EXISTS idx_attendance_child ON attendance(child_id);
 CREATE INDEX IF NOT EXISTS idx_notes_class ON parent_notes(class_id, archived);
 CREATE INDEX IF NOT EXISTS idx_notes_child ON parent_notes(child_id);
+CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
 CREATE INDEX IF NOT EXISTS idx_notes_date ON parent_notes(note_date);

@@ -1,9 +1,28 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const dayjs = require('dayjs');
 const db = require('../db');
 const { requireRole } = require('../middleware/auth');
 const { uploadImportFile, parseImportFile, randomPassword } = require('../utils/importChildren');
+const { buildBackupWorkbook } = require('../utils/exportBackup');
+const { buildMonthlyReportPdf, getMonthlyReportData } = require('../utils/monthlyReport');
+
+// Loaded once and reused for every report — avoids re-reading the file from
+// disk on each request.
+let logoDataUri = null;
+function getLogoDataUri() {
+  if (logoDataUri === null) {
+    try {
+      const buf = fs.readFileSync(path.join(__dirname, '..', 'public', 'images', 'logo.png'));
+      logoDataUri = `data:image/png;base64,${buf.toString('base64')}`;
+    } catch (e) {
+      logoDataUri = ''; // logo missing — report still renders fine without it
+    }
+  }
+  return logoDataUri;
+}
 
 const router = express.Router();
 router.use(requireRole('admin'));
@@ -442,6 +461,77 @@ router.get('/attendance', async (req, res, next) => {
       classesToday,
       totals,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Monthly PDF reports ----------
+router.get('/reports', async (req, res, next) => {
+  try {
+    const month = req.query.month && dayjs(req.query.month, 'YYYY-MM', true).isValid() ? req.query.month : dayjs().format('YYYY-MM');
+    const { classes } = await getMonthlyReportData(db, month);
+    res.render('admin/reports', {
+      title: 'التقارير الشهرية',
+      month,
+      monthLabel: dayjs(month, 'YYYY-MM').format('MMMM YYYY'),
+      prevMonth: dayjs(month, 'YYYY-MM').subtract(1, 'month').format('YYYY-MM'),
+      nextMonth: dayjs(month, 'YYYY-MM').add(1, 'month').format('YYYY-MM'),
+      classes,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/reports/download', async (req, res, next) => {
+  try {
+    const month = req.query.month && dayjs(req.query.month, 'YYYY-MM', true).isValid() ? req.query.month : dayjs().format('YYYY-MM');
+    const pdfBuffer = await buildMonthlyReportPdf(db, month, getLogoDataUri());
+    const filename = `التقرير-الشهري-${month}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Data export / backup ----------
+router.get('/export', async (req, res, next) => {
+  try {
+    const counts = await Promise.all([
+      db.execute('SELECT COUNT(*) AS c FROM users'),
+      db.execute('SELECT COUNT(*) AS c FROM children'),
+      db.execute('SELECT COUNT(*) AS c FROM attendance'),
+      db.execute('SELECT COUNT(*) AS c FROM parent_notes'),
+      db.execute('SELECT COUNT(*) AS c FROM items'),
+      db.execute('SELECT COUNT(*) AS c FROM events'),
+    ]);
+    res.render('admin/export', {
+      title: 'تصدير ونسخ احتياطي',
+      counts: {
+        users: Number(counts[0].rows[0].c),
+        children: Number(counts[1].rows[0].c),
+        attendance: Number(counts[2].rows[0].c),
+        notes: Number(counts[3].rows[0].c),
+        items: Number(counts[4].rows[0].c),
+        events: Number(counts[5].rows[0].c),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/export/download', async (req, res, next) => {
+  try {
+    const workbook = await buildBackupWorkbook(db);
+    const filename = `نسخة-احتياطية-روضة-ماما-ماريا-${dayjs().format('YYYY-MM-DD')}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (err) {
     next(err);
   }

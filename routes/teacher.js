@@ -28,6 +28,24 @@ async function staffToNotify() {
   return result.rows.map((r) => r.id);
 }
 
+// Counts how many of the child's most recent RECORDED attendance days
+// (going backward from `uptoDate`) were consecutively 'absent'. Stops at
+// the first 'present' day or when records run out — a gap with no record
+// at all (e.g. a day attendance was never taken) also stops the count,
+// since we can't assume the child was absent on a day nobody marked.
+async function computeAbsentStreak(childId, uptoDate) {
+  const result = await db.execute({
+    sql: `SELECT status FROM attendance WHERE child_id = ? AND date <= ? ORDER BY date DESC LIMIT 30`,
+    args: [childId, uptoDate],
+  });
+  let streak = 0;
+  for (const row of result.rows) {
+    if (row.status !== 'absent') break;
+    streak += 1;
+  }
+  return streak;
+}
+
 async function parentsOfClass(classId) {
   const result = await db.execute({
     sql: 'SELECT DISTINCT parent_id FROM children WHERE class_id = ? AND parent_id IS NOT NULL',
@@ -248,12 +266,19 @@ router.post('/attendance', async (req, res, next) => {
       return res.status(403).render('error', { title: 'غير مصرح', message: 'هذا الفصل ليس فصلك.' });
     }
     const date = req.body.date && dayjs(req.body.date).isValid() ? req.body.date : dayjs().format('YYYY-MM-DD');
+    const cls = classes.find((c) => c.id === classId);
 
-    const childrenResult = await db.execute({ sql: 'SELECT id FROM children WHERE class_id = ?', args: [classId] });
+    const childrenResult = await db.execute({ sql: 'SELECT id, name, parent_id FROM children WHERE class_id = ?', args: [classId] });
 
+    const newlyAbsent = [];
     for (const child of childrenResult.rows) {
       const status = req.body[`status_${child.id}`];
       if (status !== 'present' && status !== 'absent') continue;
+
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await db.execute({ sql: 'SELECT status FROM attendance WHERE child_id = ? AND date = ?', args: [child.id, date] });
+      const previousStatus = existing.rows[0] ? existing.rows[0].status : null;
+
       // eslint-disable-next-line no-await-in-loop
       await db.execute({
         sql: `INSERT INTO attendance (child_id, class_id, date, status, marked_by)
@@ -262,6 +287,38 @@ router.post('/attendance', async (req, res, next) => {
                 status = excluded.status, marked_by = excluded.marked_by, updated_at = datetime('now')`,
         args: [child.id, classId, date, status, req.session.user.id],
       });
+
+      // Only a genuine present/unmarked -> absent transition counts — resaving
+      // an already-absent day (e.g. re-submitting the same form) won't re-fire.
+      if (status === 'absent' && previousStatus !== 'absent') newlyAbsent.push(child);
+    }
+
+    // Follow-up alert for extended absences: once a child has been absent on
+    // 2+ consecutive recorded school days, notify admin/director to check in,
+    // and send the parent a gentle reminder — without exposing full attendance
+    // history to parents (they only get this targeted notification).
+    for (const child of newlyAbsent) {
+      // eslint-disable-next-line no-await-in-loop
+      const streak = await computeAbsentStreak(child.id, date);
+      if (streak < 2) continue;
+
+      // eslint-disable-next-line no-await-in-loop
+      await notifyMany(
+        await staffToNotify(),
+        `تنبيه غياب متكرر: ${child.name}`,
+        `${child.name} (${cls ? cls.name : ''}) غائب لليوم ${streak} على التوالي. يُرجى المتابعة مع الأسرة.`,
+        '/admin/attendance?view=month'
+      );
+
+      if (child.parent_id) {
+        // eslint-disable-next-line no-await-in-loop
+        await notifyMany(
+          [child.parent_id],
+          `نطمئن على ${child.name} 🌸`,
+          `لاحظنا غياب ${child.name} عن الروضة لليوم ${streak} على التوالي. نتمنى أن يكون بخير، ونتطلع لعودته قريبًا. لأي استفسار يسعدنا تواصلكم معنا.`,
+          '/parent'
+        );
+      }
     }
 
     res.redirect(`/teacher/attendance?class_id=${classId}&date=${date}`);
