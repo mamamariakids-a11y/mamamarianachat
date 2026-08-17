@@ -5,7 +5,25 @@
     <h1>ملاحظات وتوصيات الأولياء</h1>
     <div class="sub">ملاحظات وصلت من الإدارية عن أطفال فصلك</div>
   </div>
+  <div id="noteAlerts" class="note-alerts-bar">
+    <button type="button" id="noteSoundToggle" class="btn btn-secondary btn-sm"><i class="fa-solid fa-volume-xmark"></i> فعّلي التنبيه الصوتي</button>
+  </div>
 </div>
+
+<div id="noteAlertBanner" class="note-alert-banner">
+  <div class="na-icon"><i class="fa-solid fa-bell"></i></div>
+  <div>
+    <div class="na-title">ملاحظات تقترب وقت تنفيذها</div>
+    <div id="noteAlertList"></div>
+  </div>
+</div>
+
+<script type="application/json" id="noteAlertsData">
+<%- JSON.stringify(notes.filter(n => n.status === 'pending' && n.note_time).map(n => ({
+  id: n.id, note_type: n.note_type, note_date: n.note_date, note_time: n.note_time,
+  child_name: n.child_name, content: n.content
+}))) %>
+</script>
 
 <% if (!hasClass) { %>
   <div class="card">
@@ -31,6 +49,7 @@
           <div style="font-weight:800; font-size:15px;"><%= n.child_name %></div>
           <div class="text-muted" style="font-size:12px; margin-top:2px;">
             <%= categoryLabels[n.category] %> · <%= n.note_type === 'daily' ? 'ملاحظة اليوم' : 'ملاحظة دائمة' %>
+            <% if (n.note_time) { %> · <i class="fa-solid fa-bell"></i> <%= n.note_time %><% } %>
           </div>
         </div>
         <span class="badge <%= n.status === 'done' ? 'badge-executed' : 'badge-urgent' %>">
@@ -58,4 +77,5 @@
 
 <% } %>
 
+<script src="/js/note-alerts.js"></script>
 <%- include('../partials/footer') %>

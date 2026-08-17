@@ -59,7 +59,7 @@ router.get('/', async (req, res, next) => {
 
 router.post('/notes', async (req, res, next) => {
   try {
-    const { child_id, note_type, category, content, note_date } = req.body;
+    const { child_id, note_type, category, content, note_date, note_time } = req.body;
     const children = await allChildrenWithClass();
     const child = children.find((c) => c.id === Number(child_id));
 
@@ -76,11 +76,14 @@ router.post('/notes', async (req, res, next) => {
 
     const finalDate = note_type === 'daily' ? (note_date && dayjs(note_date).isValid() ? note_date : dayjs().format('YYYY-MM-DD')) : null;
     const finalCategory = ['health', 'food', 'transport', 'other'].includes(category) ? category : 'other';
+    // Optional "HH:MM" alarm time — when set, the note triggers a sound alert
+    // for the teacher as that time approaches (see public/js/note-alerts.js).
+    const finalTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(note_time || '') ? note_time : null;
 
     await db.execute({
-      sql: `INSERT INTO parent_notes (child_id, class_id, note_type, category, content, note_date, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [child.id, child.class_id, note_type, finalCategory, content.trim(), finalDate, req.session.user.id],
+      sql: `INSERT INTO parent_notes (child_id, class_id, note_type, category, content, note_date, note_time, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [child.id, child.class_id, note_type, finalCategory, content.trim(), finalDate, finalTime, req.session.user.id],
     });
 
     const classResult = await db.execute({ sql: 'SELECT teacher_id FROM classes WHERE id = ?', args: [child.class_id] });

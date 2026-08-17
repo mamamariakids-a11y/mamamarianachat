@@ -33,7 +33,7 @@
             <tr class="<%= n.archived ? 'text-muted' : '' %>">
               <td><%= n.child_name %></td>
               <td><span class="class-dot" style="background:<%= n.class_color %>; display:inline-block; margin-left:6px;"></span><%= n.class_name %></td>
-              <td style="white-space:nowrap;"><%= categoryLabels[n.category] %><br/><span class="text-muted" style="font-size:11px;"><%= n.note_type === 'daily' ? 'يوم واحد (' + n.note_date + ')' : 'دائمة' %></span></td>
+              <td style="white-space:nowrap;"><%= categoryLabels[n.category] %><br/><span class="text-muted" style="font-size:11px;"><%= n.note_type === 'daily' ? 'يوم واحد (' + n.note_date + ')' : 'دائمة' %><% if (n.note_time) { %> · <i class="fa-solid fa-bell"></i> <%= n.note_time %><% } %></span></td>
               <td style="max-width:280px;">
                 <%= n.content %>
                 <% if (n.status === 'done' && n.done_note) { %><div class="text-muted" style="font-size:12px; margin-top:4px;">رد المربية: <%= n.done_note %></div><% } %>

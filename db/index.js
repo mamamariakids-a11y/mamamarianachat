@@ -63,8 +63,23 @@ async function migrateUsersRoleCheck() {
   }
 }
 
+// Adds the optional note_time column to an already-existing parent_notes
+// table (used for the "sound alert as note time approaches" feature).
+// Unlike the CHECK-constraint change above, adding a plain nullable column
+// is natively supported by SQLite/libSQL via ALTER TABLE ... ADD COLUMN, so
+// no table rebuild is needed here — just a guarded, idempotent add.
+async function migrateParentNotesAddTime() {
+  const existing = await db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='parent_notes'");
+  if (!existing.rows.length) return; // table doesn't exist yet — schema.sql below creates it with note_time already
+  const cols = await db.execute('PRAGMA table_info(parent_notes)');
+  const hasTime = cols.rows.some((r) => r.name === 'note_time');
+  if (hasTime) return; // already up to date
+  await db.execute('ALTER TABLE parent_notes ADD COLUMN note_time TEXT');
+}
+
 async function init() {
   await migrateUsersRoleCheck();
+  await migrateParentNotesAddTime();
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await db.executeMultiple(schema);
   try {

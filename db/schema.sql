@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS parent_notes (
   category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('health','food','transport','other')),
   content TEXT NOT NULL,
   note_date TEXT,
+  note_time TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done')),
   created_by INTEGER REFERENCES users(id),
   done_by INTEGER REFERENCES users(id),

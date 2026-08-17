@@ -267,6 +267,22 @@ input:focus, select:focus, textarea:focus {
 .alert-success { background: var(--color-secondary-light); color: #1E6E6E; }
 .alert-info { background: var(--color-primary-light); color: var(--color-primary-dark); }
 
+/* ---------- Note time alerts (sound reminder as a note's time approaches) ---------- */
+.note-alerts-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+.note-alert-banner {
+  display: none; align-items: flex-start; gap: 10px; padding: 14px 16px; border-radius: var(--radius-sm);
+  background: var(--color-danger-light); color: var(--color-danger); margin-bottom: 16px;
+  border: 1px solid rgba(217, 99, 79, .25); animation: note-alert-pulse 1.6s ease-in-out infinite;
+}
+.note-alert-banner .na-icon { font-size: 20px; margin-top: 2px; }
+.note-alert-banner .na-title { font-weight: 800; font-size: 13.5px; margin-bottom: 6px; }
+.note-alert-item { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.note-alert-time { font-weight: 700; opacity: .85; }
+@keyframes note-alert-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 99, 79, .25); }
+  50% { box-shadow: 0 0 0 6px rgba(217, 99, 79, 0); }
+}
+
 /* ---------- Badges ---------- */
 .badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 30px;
