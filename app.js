@@ -1,83 +1,90 @@
-// روضة ماما ماريا — سلوكيات الواجهة العامة
-(function () {
-  const bellBtn = document.getElementById('bellBtn');
-  const dropdown = document.getElementById('notifDropdown');
-  const notifList = document.getElementById('notifList');
+const path = require('path');
+const express = require('express');
+const session = require('express-session');
 
-  function timeAgo(dateStr) {
-    const diff = (Date.now() - new Date(dateStr.replace(' ', 'T') + 'Z').getTime()) / 1000;
-    if (diff < 60) return 'الآن';
-    if (diff < 3600) return `منذ ${Math.floor(diff / 60)} دقيقة`;
-    if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} ساعة`;
-    return `منذ ${Math.floor(diff / 86400)} يوم`;
-  }
+const db = require('./db');
+const { attachUser } = require('./middleware/auth');
 
-  async function loadRecentNotifications() {
-    try {
-      const res = await fetch('/notifications/recent');
-      const data = await res.json();
-      if (!data.items || !data.items.length) {
-        notifList.innerHTML = '<div class="notif-empty">لا توجد إشعارات بعد</div>';
-        return;
-      }
-      notifList.innerHTML = data.items
-        .map(
-          (n) => `
-        <div class="notif-item">
-          <div class="nt">${escapeHtml(n.title)}</div>
-          ${n.message ? `<div class="nm">${escapeHtml(n.message)}</div>` : ''}
-          <div class="nd">${timeAgo(n.created_at)}</div>
-        </div>`
-        )
-        .join('');
-    } catch (e) {
-      notifList.innerHTML = '<div class="notif-empty">تعذر تحميل الإشعارات</div>';
-    }
-  }
+const app = express();
+const PORT = process.env.PORT || 3000;
+const isProd = process.env.NODE_ENV === 'production';
 
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.set('trust proxy', 1);
 
-  if (bellBtn) {
-    bellBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.toggle('open');
-      if (dropdown.classList.contains('open')) loadRecentNotifications();
-    });
-    document.addEventListener('click', (e) => {
-      if (!dropdown.contains(e.target) && e.target !== bellBtn) {
-        dropdown.classList.remove('open');
-      }
-    });
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-    async function pollUnread() {
-      try {
-        const res = await fetch('/notifications/unread-count');
-        const data = await res.json();
-        bellBtn.classList.toggle('has-unread', data.count > 0);
-      } catch (e) {
-        /* ignore */
-      }
-    }
-    setInterval(pollUnread, 30000);
-  }
+// Sessions are kept in memory (not persisted to disk/DB). That means a
+// restart logs everyone out, which is a minor inconvenience — but it keeps
+// the app fully stateless on the host's own filesystem, which is what lets
+// it run on a free web service tier (see db/index.js for how the actual
+// lesson/activity data stays safe on Turso regardless of restarts).
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'mamamaria-kindergarten-secret-change-me',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 14, // 14 days
+      httpOnly: true,
+      secure: isProd,
+    },
+  })
+);
 
-  // Checkbox pill visual state (class selection in item form)
-  document.querySelectorAll('.checkbox-pill input[type=checkbox]').forEach((cb) => {
-    const pill = cb.closest('.checkbox-pill');
-    if (cb.checked) pill.classList.add('checked');
-    cb.addEventListener('change', () => pill.classList.toggle('checked', cb.checked));
+app.use(attachUser(db));
+
+app.locals.dayjs = require('dayjs');
+require('dayjs/locale/ar');
+app.locals.dayjs.locale('ar');
+
+app.get('/', (req, res) => {
+  if (!req.session.user) return res.redirect('/login');
+  const roleHome = {
+    admin: '/admin',
+    director: '/director',
+    teacher: '/teacher',
+    parent: '/parent',
+  };
+  res.redirect(roleHome[req.session.user.role] || '/login');
+});
+
+app.use('/', require('./routes/auth'));
+app.use('/account', require('./routes/account'));
+app.use('/notifications', require('./routes/notifications'));
+app.use('/director', require('./routes/director'));
+app.use('/teacher', require('./routes/teacher'));
+app.use('/admin', require('./routes/admin'));
+app.use('/parent', require('./routes/parent'));
+
+app.use((req, res) => {
+  res.status(404).render('error', {
+    title: 'الصفحة غير موجودة',
+    message: 'عذرًا، الصفحة التي تبحث عنها غير موجودة.',
+    user: req.session.user,
   });
+});
 
-  // File input preview label
-  document.querySelectorAll('input[type=file]').forEach((input) => {
-    const label = input.parentElement.querySelector('.file-label-text');
-    if (!label) return;
-    input.addEventListener('change', () => {
-      label.textContent = input.files.length ? `${input.files.length} ملف/ملفات محددة` : label.dataset.default;
-    });
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).render('error', {
+    title: 'حدث خطأ',
+    message: err.message || 'حدث خطأ غير متوقع، يرجى المحاولة لاحقًا.',
+    user: req.session.user,
   });
-})();
+});
+
+// Wait for the schema to be created (and, on first boot, the demo data
+// seeded) before accepting requests.
+db.ready.then(() => {
+  app.listen(PORT, () => {
+    console.log(`🌱 روضة ماما ماريا تعمل الآن على المنفذ ${PORT}`);
+  });
+}).catch((err) => {
+  console.error('فشل الاتصال بقاعدة البيانات عند بدء التشغيل:', err);
+  process.exit(1);
+});
