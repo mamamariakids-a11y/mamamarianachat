@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { createClient } = require('@libsql/client');
-const { seedIfEmpty } = require('./seed-data');
+const { seedIfEmpty, ensureDemoUsersExist } = require('./seed-data');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
@@ -76,6 +76,11 @@ async function init() {
   const didSeed = await seedIfEmpty(db);
   if (didSeed) {
     console.log('تمت تعبئة قاعدة البيانات ببيانات أولية تلقائيًا (أول تشغيل).');
+  } else {
+    // Site already has real data — still make sure any demo accounts added
+    // in a later update (e.g. staff1@mamamaria.test) exist, without
+    // touching any existing (real or demo) account.
+    await ensureDemoUsersExist(db);
   }
 }
 
