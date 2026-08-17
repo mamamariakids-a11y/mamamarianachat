@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const dayjs = require('dayjs');
 const db = require('../db');
 const { requireRole } = require('../middleware/auth');
+const { uploadImportFile, parseImportFile, randomPassword } = require('../utils/importChildren');
 
 const router = express.Router();
 router.use(requireRole('admin'));
@@ -227,6 +228,128 @@ router.post('/children/:id/delete', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---------- Bulk import of children (from Excel/CSV) ----------
+router.post('/children/import', (req, res, next) => {
+  uploadImportFile.single('import_file')(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      return res.status(400).render('admin/children-import-result', {
+        title: 'نتيجة الاستيراد',
+        fileError: uploadErr.message || 'تعذّر قراءة الملف.',
+        summary: null,
+      });
+    }
+    if (!req.file) {
+      return res.status(400).render('admin/children-import-result', {
+        title: 'نتيجة الاستيراد',
+        fileError: 'يرجى اختيار ملف Excel أو CSV أولًا.',
+        summary: null,
+      });
+    }
+
+    let records;
+    try {
+      ({ records } = await parseImportFile(req.file.buffer, req.file.originalname));
+    } catch (parseErr) {
+      return res.status(400).render('admin/children-import-result', {
+        title: 'نتيجة الاستيراد',
+        fileError: 'تعذّر فتح هذا الملف. تأكدي أنه ملف Excel أو CSV سليم وغير تالف (يمكنك تنزيل القالب من جديد والبدء منه).',
+        summary: null,
+      });
+    }
+
+    try {
+      if (!records.length) {
+        return res.status(400).render('admin/children-import-result', {
+          title: 'نتيجة الاستيراد',
+          fileError: 'لم يتم العثور على أي بيانات صالحة في الملف. تأكدي من استخدام القالب المرفق وعدم تغيير صف العناوين.',
+          summary: null,
+        });
+      }
+
+      const classesResult = await db.execute('SELECT id, name FROM classes');
+      const classByName = new Map(classesResult.rows.map((c) => [c.name.trim().toLowerCase(), c.id]));
+
+      const parentsResult = await db.execute("SELECT id, email FROM users WHERE role='parent'");
+      const parentIdByEmail = new Map(parentsResult.rows.map((p) => [p.email.trim().toLowerCase(), p.id]));
+
+      const added = [];
+      const skipped = [];
+      const errors = [];
+      const newParents = [];
+
+      for (const rec of records) {
+        if (!rec.child_name || !rec.class_name) {
+          errors.push({ rowNum: rec.rowNum, reason: 'اسم الطفل أو اسم الفصل مفقود.' });
+          continue;
+        }
+
+        const classId = classByName.get(rec.class_name.trim().toLowerCase());
+        if (!classId) {
+          errors.push({ rowNum: rec.rowNum, reason: `الفصل "${rec.class_name}" غير موجود في البرنامج.` });
+          continue;
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        const existingResult = await db.execute({
+          sql: 'SELECT id FROM children WHERE class_id = ? AND LOWER(TRIM(name)) = ?',
+          args: [classId, rec.child_name.trim().toLowerCase()],
+        });
+        if (existingResult.rows.length) {
+          skipped.push({ rowNum: rec.rowNum, reason: `الطفل "${rec.child_name}" موجود بالفعل في هذا الفصل.` });
+          continue;
+        }
+
+        let parentId = null;
+        let parentNote = null;
+        if (rec.parent_email) {
+          const emailKey = rec.parent_email.trim().toLowerCase();
+          if (parentIdByEmail.has(emailKey)) {
+            parentId = parentIdByEmail.get(emailKey);
+          } else {
+            const tempPassword = randomPassword();
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const insertParent = await db.execute({
+                sql: 'INSERT INTO users (name, email, password_hash, role, phone, avatar_color) VALUES (?, ?, ?, ?, ?, ?)',
+                args: [rec.parent_name || rec.child_name + ' - ولي أمر', emailKey, bcrypt.hashSync(tempPassword, 10), 'parent', rec.parent_phone || '', randomColor()],
+              });
+              parentId = Number(insertParent.lastInsertRowid);
+              parentIdByEmail.set(emailKey, parentId);
+              newParents.push({ name: rec.parent_name || '—', email: emailKey, password: tempPassword });
+            } catch (e) {
+              // Extremely unlikely race (email created moments earlier) — re-check and link instead.
+              // eslint-disable-next-line no-await-in-loop
+              const recheck = await db.execute({ sql: 'SELECT id FROM users WHERE email = ?', args: [emailKey] });
+              if (recheck.rows.length) {
+                parentId = recheck.rows[0].id;
+                parentIdByEmail.set(emailKey, parentId);
+              }
+            }
+          }
+        } else if (rec.parent_name) {
+          parentNote = 'لم يُنشأ حساب لولي الأمر (البريد الإلكتروني مفقود).';
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        await db.execute({
+          sql: 'INSERT INTO children (name, class_id, parent_id) VALUES (?, ?, ?)',
+          args: [rec.child_name.trim(), classId, parentId],
+        });
+
+        added.push({ rowNum: rec.rowNum, name: rec.child_name.trim(), className: rec.class_name.trim(), parentNote });
+      }
+
+      res.render('admin/children-import-result', {
+        title: 'نتيجة الاستيراد',
+        fileError: null,
+        summary: { added, skipped, errors, newParents },
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
 });
 
 // ---------- Attendance ----------
