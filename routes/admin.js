@@ -229,4 +229,99 @@ router.post('/children/:id/delete', async (req, res, next) => {
   }
 });
 
+// ---------- Attendance ----------
+router.get('/attendance', async (req, res, next) => {
+  try {
+    const view = req.query.view === 'month' ? 'month' : 'day';
+
+    if (view === 'month') {
+      const month = req.query.month && dayjs(req.query.month, 'YYYY-MM', true).isValid() ? req.query.month : dayjs().format('YYYY-MM');
+      const monthStart = dayjs(month, 'YYYY-MM').startOf('month').format('YYYY-MM-DD');
+      const monthEnd = dayjs(month, 'YYYY-MM').endOf('month').format('YYYY-MM-DD');
+
+      const rowsResult = await db.execute({
+        sql: `SELECT children.id AS child_id, children.name AS child_name,
+                     classes.id AS class_id, classes.name AS class_name, classes.color AS class_color,
+                     SUM(CASE WHEN attendance.status='present' THEN 1 ELSE 0 END) AS present_count,
+                     SUM(CASE WHEN attendance.status='absent' THEN 1 ELSE 0 END) AS absent_count
+              FROM children
+              JOIN classes ON classes.id = children.class_id
+              LEFT JOIN attendance ON attendance.child_id = children.id AND attendance.date BETWEEN ? AND ?
+              GROUP BY children.id
+              ORDER BY classes.name, children.name`,
+        args: [monthStart, monthEnd],
+      });
+
+      const children = rowsResult.rows.map((r) => {
+        const present = Number(r.present_count);
+        const absent = Number(r.absent_count);
+        const marked = present + absent;
+        return { ...r, present_count: present, absent_count: absent, marked, rate: marked ? Math.round((present / marked) * 100) : null };
+      });
+
+      const classesMap = new Map();
+      children.forEach((c) => {
+        if (!classesMap.has(c.class_id)) classesMap.set(c.class_id, { id: c.class_id, name: c.class_name, color: c.class_color, children: [], present: 0, marked: 0 });
+        const cls = classesMap.get(c.class_id);
+        cls.children.push(c);
+        cls.present += c.present_count;
+        cls.marked += c.marked;
+      });
+      const classesReport = [...classesMap.values()].map((c) => ({ ...c, rate: c.marked ? Math.round((c.present / c.marked) * 100) : null }));
+
+      return res.render('admin/attendance', {
+        title: 'الحضور والغياب',
+        view,
+        month,
+        monthLabel: dayjs(month, 'YYYY-MM').format('MMMM YYYY'),
+        prevMonth: dayjs(month, 'YYYY-MM').subtract(1, 'month').format('YYYY-MM'),
+        nextMonth: dayjs(month, 'YYYY-MM').add(1, 'month').format('YYYY-MM'),
+        classesReport,
+      });
+    }
+
+    const date = req.query.date && dayjs(req.query.date).isValid() ? req.query.date : dayjs().format('YYYY-MM-DD');
+
+    const rowsResult = await db.execute({
+      sql: `SELECT children.id AS child_id, children.name AS child_name,
+                   classes.id AS class_id, classes.name AS class_name, classes.color AS class_color,
+                   attendance.status, users.name AS marked_by_name
+            FROM children
+            JOIN classes ON classes.id = children.class_id
+            LEFT JOIN attendance ON attendance.child_id = children.id AND attendance.date = ?
+            LEFT JOIN users ON users.id = attendance.marked_by
+            ORDER BY classes.name, children.name`,
+      args: [date],
+    });
+
+    const classesMap = new Map();
+    rowsResult.rows.forEach((r) => {
+      if (!classesMap.has(r.class_id)) classesMap.set(r.class_id, { id: r.class_id, name: r.class_name, color: r.class_color, children: [], present: 0, absent: 0, unmarked: 0 });
+      const cls = classesMap.get(r.class_id);
+      cls.children.push(r);
+      if (r.status === 'present') cls.present += 1;
+      else if (r.status === 'absent') cls.absent += 1;
+      else cls.unmarked += 1;
+    });
+    const classesToday = [...classesMap.values()];
+    const totals = classesToday.reduce(
+      (acc, c) => ({ present: acc.present + c.present, absent: acc.absent + c.absent, unmarked: acc.unmarked + c.unmarked }),
+      { present: 0, absent: 0, unmarked: 0 }
+    );
+
+    res.render('admin/attendance', {
+      title: 'الحضور والغياب',
+      view,
+      date,
+      isToday: date === dayjs().format('YYYY-MM-DD'),
+      prevDate: dayjs(date).subtract(1, 'day').format('YYYY-MM-DD'),
+      nextDate: dayjs(date).add(1, 'day').format('YYYY-MM-DD'),
+      classesToday,
+      totals,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

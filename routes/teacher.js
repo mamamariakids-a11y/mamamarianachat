@@ -13,6 +13,14 @@ async function myClassIds(userId) {
   return result.rows.map((r) => r.id);
 }
 
+async function myClasses(userId) {
+  const result = await db.execute({
+    sql: 'SELECT id, name, color FROM classes WHERE teacher_id = ? ORDER BY name',
+    args: [userId],
+  });
+  return result.rows;
+}
+
 async function staffToNotify() {
   const result = await db.execute("SELECT id FROM users WHERE role IN ('director','admin') AND active = 1");
   return result.rows.map((r) => r.id);
@@ -178,6 +186,83 @@ router.post('/items/:id/execute', upload.array('photos', 8), async (req, res, ne
     );
 
     res.redirect(`/teacher/items/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Attendance ----------
+router.get('/attendance', async (req, res, next) => {
+  try {
+    const classes = await myClasses(req.session.user.id);
+    if (!classes.length) {
+      return res.render('teacher/attendance', {
+        title: 'الحضور والغياب',
+        classes: [],
+        activeClass: null,
+        date: dayjs().format('YYYY-MM-DD'),
+        children: [],
+      });
+    }
+
+    const requestedClassId = Number(req.query.class_id) || classes[0].id;
+    const activeClass = classes.find((c) => c.id === requestedClassId) || classes[0];
+    const date = req.query.date && dayjs(req.query.date).isValid() ? req.query.date : dayjs().format('YYYY-MM-DD');
+
+    const childrenResult = await db.execute({
+      sql: 'SELECT id, name FROM children WHERE class_id = ? ORDER BY name',
+      args: [activeClass.id],
+    });
+
+    const attResult = await db.execute({
+      sql: 'SELECT child_id, status FROM attendance WHERE class_id = ? AND date = ?',
+      args: [activeClass.id, date],
+    });
+    const statusMap = {};
+    attResult.rows.forEach((r) => { statusMap[r.child_id] = r.status; });
+
+    const children = childrenResult.rows.map((c) => ({ ...c, status: statusMap[c.id] || null }));
+    const markedCount = children.filter((c) => c.status).length;
+
+    res.render('teacher/attendance', {
+      title: 'الحضور والغياب',
+      classes,
+      activeClass,
+      date,
+      children,
+      markedCount,
+      isToday: date === dayjs().format('YYYY-MM-DD'),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/attendance', async (req, res, next) => {
+  try {
+    const classes = await myClasses(req.session.user.id);
+    const classId = Number(req.body.class_id);
+    if (!classes.some((c) => c.id === classId)) {
+      return res.status(403).render('error', { title: 'غير مصرح', message: 'هذا الفصل ليس فصلك.' });
+    }
+    const date = req.body.date && dayjs(req.body.date).isValid() ? req.body.date : dayjs().format('YYYY-MM-DD');
+
+    const childrenResult = await db.execute({ sql: 'SELECT id FROM children WHERE class_id = ?', args: [classId] });
+
+    for (const child of childrenResult.rows) {
+      const status = req.body[`status_${child.id}`];
+      if (status !== 'present' && status !== 'absent') continue;
+      // eslint-disable-next-line no-await-in-loop
+      await db.execute({
+        sql: `INSERT INTO attendance (child_id, class_id, date, status, marked_by)
+              VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT(child_id, date) DO UPDATE SET
+                status = excluded.status, marked_by = excluded.marked_by, updated_at = datetime('now')`,
+        args: [child.id, classId, date, status, req.session.user.id],
+      });
+    }
+
+    res.redirect(`/teacher/attendance?class_id=${classId}&date=${date}`);
   } catch (err) {
     next(err);
   }

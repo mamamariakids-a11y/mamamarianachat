@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS item_assignments (
   UNIQUE(item_id, class_id)
 );
 
+-- Daily attendance: one row per (child, date), recorded by the teacher
+CREATE TABLE IF NOT EXISTS attendance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('present','absent')),
+  marked_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(child_id, date)
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -74,3 +87,6 @@ CREATE INDEX IF NOT EXISTS idx_items_date ON items(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_assignments_class ON item_assignments(class_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_item ON item_assignments(item_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON attendance(class_id, date);
+CREATE INDEX IF NOT EXISTS idx_attendance_child ON attendance(child_id);

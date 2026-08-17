@@ -256,6 +256,12 @@ input:focus, select:focus, textarea:focus {
 .radio-row input:checked + span { color: var(--color-primary); }
 .radio-row label:has(input:checked) { border-color: var(--color-primary); background: var(--color-primary-light); }
 
+.att-radio { max-width: 260px; }
+.att-radio label:has(input[value="present"]:checked) { border-color: var(--color-secondary); background: var(--color-secondary-light); }
+.att-radio label:has(input[value="present"]:checked) span { color: #1E6E6E; }
+.att-radio label:has(input[value="absent"]:checked) { border-color: var(--color-danger); background: var(--color-danger-light); }
+.att-radio label:has(input[value="absent"]:checked) span { color: var(--color-danger); }
+
 .alert { padding: 13px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 600; margin-bottom: 16px; }
 .alert-danger { background: var(--color-danger-light); color: var(--color-danger); }
 .alert-success { background: var(--color-secondary-light); color: #1E6E6E; }

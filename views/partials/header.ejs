@@ -28,6 +28,7 @@
         <a class="nav-link <%= currentPath === '/admin/users' ? 'active' : '' %>" href="/admin/users"><span class="icon"><i class="fa-solid fa-users"></i></span> المستخدمون</a>
         <a class="nav-link <%= currentPath === '/admin/classes' ? 'active' : '' %>" href="/admin/classes"><span class="icon"><i class="fa-solid fa-chalkboard"></i></span> الفصول</a>
         <a class="nav-link <%= currentPath === '/admin/children' ? 'active' : '' %>" href="/admin/children"><span class="icon"><i class="fa-solid fa-child-reaching"></i></span> الأطفال</a>
+        <a class="nav-link <%= currentPath === '/admin/attendance' ? 'active' : '' %>" href="/admin/attendance"><span class="icon"><i class="fa-solid fa-clipboard-check"></i></span> الحضور والغياب</a>
         <div class="nav-section-title">الدروس والأنشطة</div>
         <a class="nav-link <%= currentPath === '/director' ? 'active' : '' %>" href="/director"><span class="icon"><i class="fa-solid fa-calendar-days"></i></span> التقويم التربوي</a>
         <a class="nav-link <%= currentPath === '/director/items/new' ? 'active' : '' %>" href="/director/items/new"><span class="icon"><i class="fa-solid fa-circle-plus"></i></span> إنشاء درس/نشاط</a>
@@ -42,6 +43,7 @@
       <% if (user && user.role === 'teacher') { %>
         <div class="nav-section-title">مربيتي</div>
         <a class="nav-link <%= currentPath === '/teacher' ? 'active' : '' %>" href="/teacher"><span class="icon"><i class="fa-solid fa-calendar-week"></i></span> جدولي الأسبوعي</a>
+        <a class="nav-link <%= currentPath === '/teacher/attendance' ? 'active' : '' %>" href="/teacher/attendance"><span class="icon"><i class="fa-solid fa-clipboard-check"></i></span> الحضور والغياب</a>
       <% } %>
 
       <% if (user && user.role === 'parent') { %>
