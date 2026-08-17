@@ -1,46 +1,53 @@
-function requireLogin(req, res, next) {
-  if (!req.session.user) {
-    return res.redirect('/login');
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const db = require('../db');
+
+const router = express.Router();
+
+const ROLE_HOME = {
+  admin: '/admin',
+  director: '/director',
+  teacher: '/teacher',
+  parent: '/parent',
+};
+
+router.get('/login', (req, res) => {
+  if (req.session.user) return res.redirect(ROLE_HOME[req.session.user.role]);
+  res.render('auth/login', { error: null, layout: false });
+});
+
+router.post('/login', async (req, res, next) => {
+  try {
+  const { email, password } = req.body;
+  const result = await db.execute({
+    sql: 'SELECT * FROM users WHERE email = ? AND active = 1',
+    args: [(email || '').trim().toLowerCase()],
+  });
+  const user = result.rows[0];
+
+  if (!user || !bcrypt.compareSync(password || '', user.password_hash)) {
+    return res.status(401).render('auth/login', {
+      error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+      layout: false,
+    });
   }
-  next();
-}
 
-function requireRole(...roles) {
-  return (req, res, next) => {
-    if (!req.session.user) {
-      return res.redirect('/login');
-    }
-    if (!roles.includes(req.session.user.role)) {
-      return res.status(403).render('error', {
-        title: 'غير مصرح',
-        message: 'ليس لديك صلاحية للوصول إلى هذه الصفحة.',
-        user: req.session.user,
-      });
-    }
-    next();
+  req.session.user = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar_color: user.avatar_color,
   };
-}
 
-// Makes the logged-in user + unread notification count available to every view
-function attachUser(db) {
-  return async (req, res, next) => {
-    try {
-      res.locals.user = req.session.user || null;
-      res.locals.currentPath = req.path;
-      if (req.session.user) {
-        const result = await db.execute({
-          sql: 'SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0',
-          args: [req.session.user.id],
-        });
-        res.locals.unreadCount = Number(result.rows[0].c);
-      } else {
-        res.locals.unreadCount = 0;
-      }
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
-}
+  res.redirect(ROLE_HOME[user.role] || '/');
+  } catch (err) {
+    next(err);
+  }
+});
 
-module.exports = { requireLogin, requireRole, attachUser };
+router.post('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login'));
+});
+
+module.exports = router;
