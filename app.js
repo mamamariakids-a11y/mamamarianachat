@@ -61,6 +61,7 @@ app.use('/teacher', require('./routes/teacher'));
 app.use('/admin', require('./routes/admin'));
 app.use('/parent', require('./routes/parent'));
 app.use('/staff', require('./routes/staff'));
+app.use('/events', require('./routes/events'));
 
 app.use((req, res) => {
   res.status(404).render('error', {

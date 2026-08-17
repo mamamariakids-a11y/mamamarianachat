@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@libsql/client": "^0.17.4",
+    "@react-pdf/renderer": "^4.6.1",
     "bcryptjs": "^3.0.3",
     "dayjs": "^1.11.22",
     "dotenv": "^17.4.2",
@@ -20,6 +21,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "react": "^19.2.8"
   }
 }
