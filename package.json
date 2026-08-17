@@ -12,9 +12,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
-    "connect-sqlite3": "^0.9.18",
     "dayjs": "^1.11.22",
     "dotenv": "^17.4.2",
     "ejs": "^6.0.1",

@@ -1,22 +1,21 @@
 # Render Blueprint — يقرأ Render هذا الملف تلقائيًا عند اختيار "New +" -> "Blueprint"
-# وربط هذا المستودع، وينشئ الخدمة + القرص الدائم + المتغيرات دفعة واحدة
-# دون أي إعداد يدوي إضافي.
+# وربط هذا المستودع، وينشئ الخدمة (على الخطة المجانية بالكامل) والمتغيرات دفعة واحدة.
+# قاعدة البيانات نفسها مستضافة مجانًا على Turso (بدون بطاقة دفع) — تحتاجين فقط
+# لإدخال رابطها ومفتاحها عند إعداد الـ Blueprint (راجعي الدليل المصور).
 services:
   - type: web
     name: mamamaria-kindergarten
     env: node
-    plan: starter
+    plan: free
     region: frankfurt
     buildCommand: npm install
     startCommand: npm start
-    disk:
-      name: mamamaria-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /data
       - key: SESSION_SECRET
         generateValue: true
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
