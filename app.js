@@ -38,7 +38,16 @@ app.use(
 app.use(attachUser(db));
 
 app.locals.dayjs = require('dayjs');
-require('dayjs/locale/ar');
+const arLocale = require('dayjs/locale/ar');
+// Kindergarten director asked for August specifically to read "أوت" (the
+// colloquial Algerian name), while every other month keeps its standard
+// Modern Standard Arabic name. dayjs.locale(name, obj) REPLACES the whole
+// locale definition rather than merging it — so we spread the full base
+// 'ar' locale (weekdays, formats, etc.) and only override months/monthsShort,
+// instead of switching to the full ar-dz locale (which renames all twelve
+// months to their French-derived forms).
+const monthsWithAout = 'يناير_فبراير_مارس_أبريل_مايو_يونيو_يوليو_أوت_سبتمبر_أكتوبر_نوفمبر_ديسمبر'.split('_');
+app.locals.dayjs.locale('ar', { ...arLocale, months: monthsWithAout, monthsShort: monthsWithAout });
 app.locals.dayjs.locale('ar');
 
 app.get('/', (req, res) => {

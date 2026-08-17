@@ -155,7 +155,14 @@ function ClassPage({ logoBase64, monthLabel, generatedAt, cls, notesSummary }) {
 // shown on-screen always match exactly what gets downloaded.
 async function getMonthlyReportData(db, month) {
   const dayjs = require('dayjs');
-  require('dayjs/locale/ar');
+  const arLocale = require('dayjs/locale/ar');
+  // Same "أوت" override as app.js (see the comment there) — kept here too so
+  // this function's month label is correct even if it's ever called before
+  // app.js has run (e.g. in a standalone script or test). Spreading the full
+  // base locale keeps weekdays/formats intact; dayjs.locale(name, obj) would
+  // otherwise replace the whole locale definition, not merge into it.
+  const monthsWithAout = 'يناير_فبراير_مارس_أبريل_مايو_يونيو_يوليو_أوت_سبتمبر_أكتوبر_نوفمبر_ديسمبر'.split('_');
+  dayjs.locale('ar', { ...arLocale, months: monthsWithAout, monthsShort: monthsWithAout });
   const monthStart = dayjs(month, 'YYYY-MM').startOf('month').format('YYYY-MM-DD');
   const monthEnd = dayjs(month, 'YYYY-MM').endOf('month').format('YYYY-MM-DD');
   const monthLabel = dayjs(month, 'YYYY-MM').locale('ar').format('MMMM YYYY');
