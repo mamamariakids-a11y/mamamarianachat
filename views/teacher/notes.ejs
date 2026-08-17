@@ -1,0 +1,61 @@
+<%- include('../partials/header') %>
+
+<div class="page-actions">
+  <div>
+    <h1>ملاحظات وتوصيات الأولياء</h1>
+    <div class="sub">ملاحظات وصلت من الإدارية عن أطفال فصلك</div>
+  </div>
+</div>
+
+<% if (!hasClass) { %>
+  <div class="card">
+    <div class="empty-state">
+      <div class="es-icon">🏫</div>
+      <h3>لم يتم تعيين فصل لحسابك بعد</h3>
+      <p>يرجى التواصل مع إدارة الروضة لربط حسابك بأحد الفصول.</p>
+    </div>
+  </div>
+<% } else if (!notes.length) { %>
+  <div class="card mt-0">
+    <div class="empty-state">
+      <div class="es-icon">📝</div>
+      <h3>لا توجد ملاحظات نشطة حاليًا</h3>
+    </div>
+  </div>
+<% } else { %>
+
+  <% notes.forEach(function(n) { %>
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:10px; align-items:flex-start;">
+        <div>
+          <div style="font-weight:800; font-size:15px;"><%= n.child_name %></div>
+          <div class="text-muted" style="font-size:12px; margin-top:2px;">
+            <%= categoryLabels[n.category] %> · <%= n.note_type === 'daily' ? 'ملاحظة اليوم' : 'ملاحظة دائمة' %>
+          </div>
+        </div>
+        <span class="badge <%= n.status === 'done' ? 'badge-executed' : 'badge-urgent' %>">
+          <span class="badge-dot"></span> <%= n.status === 'done' ? 'تم الاطلاع' : 'بانتظار الاطلاع' %>
+        </span>
+      </div>
+
+      <p style="margin-bottom:14px;"><%= n.content %></p>
+
+      <% if (n.status === 'pending') { %>
+        <form method="POST" action="/teacher/notes/<%= n.id %>/acknowledge">
+          <div class="form-group mt-0">
+            <label class="field-label">ملاحظة عند التأكيد (اختياري)</label>
+            <input type="text" name="done_note" placeholder="مثال: تم إعطاء الدواء الساعة 12:15" />
+          </div>
+          <button type="submit" class="btn btn-success"><i class="fa-solid fa-check"></i> تأكيد الاطلاع/التنفيذ</button>
+        </form>
+      <% } else { %>
+        <div class="alert alert-success" style="margin-bottom:0;">
+          تم التأكيد<% if (n.done_note) { %>: <%= n.done_note %><% } %>
+        </div>
+      <% } %>
+    </div>
+  <% }) %>
+
+<% } %>
+
+<%- include('../partials/footer') %>

@@ -5,6 +5,8 @@ const { requireRole } = require('../middleware/auth');
 const upload = require('../utils/upload');
 const { notifyMany } = require('../utils/notify');
 
+const NOTE_CATEGORY_LABELS = { health: '💊 صحة/دواء', food: '🍽️ طعام', transport: '🚌 نقل', other: '📝 أخرى' };
+
 const router = express.Router();
 router.use(requireRole('teacher'));
 
@@ -263,6 +265,67 @@ router.post('/attendance', async (req, res, next) => {
     }
 
     res.redirect(`/teacher/attendance?class_id=${classId}&date=${date}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- Parent notes ----------
+router.get('/notes', async (req, res, next) => {
+  try {
+    const classIds = await myClassIds(req.session.user.id);
+    const today = dayjs().format('YYYY-MM-DD');
+    let notes = [];
+    if (classIds.length) {
+      const placeholders = classIds.map(() => '?').join(',');
+      const result = await db.execute({
+        sql: `SELECT parent_notes.*, children.name AS child_name, classes.name AS class_name
+              FROM parent_notes
+              JOIN children ON children.id = parent_notes.child_id
+              JOIN classes ON classes.id = parent_notes.class_id
+              WHERE parent_notes.archived = 0 AND parent_notes.class_id IN (${placeholders})
+                AND (parent_notes.note_type = 'permanent' OR parent_notes.note_date = ?)
+              ORDER BY parent_notes.status ASC, parent_notes.created_at DESC`,
+        args: [...classIds, today],
+      });
+      notes = result.rows;
+    }
+    res.render('teacher/notes', {
+      title: 'ملاحظات وتوصيات الأولياء',
+      notes,
+      categoryLabels: NOTE_CATEGORY_LABELS,
+      hasClass: classIds.length > 0,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/notes/:id/acknowledge', async (req, res, next) => {
+  try {
+    const classIds = await myClassIds(req.session.user.id);
+    const noteResult = await db.execute({ sql: 'SELECT * FROM parent_notes WHERE id = ?', args: [req.params.id] });
+    const note = noteResult.rows[0];
+    if (!note || !classIds.includes(note.class_id)) {
+      return res.status(403).render('error', { title: 'غير مصرح', message: 'هذه الملاحظة ليست لفصلك.' });
+    }
+
+    await db.execute({
+      sql: "UPDATE parent_notes SET status='done', done_by=?, done_at=datetime('now'), done_note=? WHERE id=?",
+      args: [req.session.user.id, req.body.done_note || '', note.id],
+    });
+
+    const childResult = await db.execute({ sql: 'SELECT name FROM children WHERE id = ?', args: [note.child_id] });
+    const childName = childResult.rows[0] ? childResult.rows[0].name : '';
+    const notifyIds = [note.created_by, ...(await staffToNotify())].filter(Boolean);
+    await notifyMany(
+      notifyIds,
+      `تم الاطلاع على ملاحظة ${childName}`,
+      `قامت ${req.session.user.name} بتأكيد الاطلاع/التنفيذ${req.body.done_note ? ': ' + req.body.done_note : ''}`,
+      '/director/notes'
+    );
+
+    res.redirect('/teacher/notes');
   } catch (err) {
     next(err);
   }

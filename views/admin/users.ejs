@@ -1,7 +1,7 @@
 <%- include('../partials/header') %>
 <%
-  const roleLabels = { admin: 'مديرة الروضة', director: 'المديرة التربوية', teacher: 'مربية', parent: 'ولي أمر' };
-  const roleColors = { admin: 'badge-urgent', director: 'badge-received', teacher: 'badge-executed', parent: 'badge-normal' };
+  const roleLabels = { admin: 'مديرة الروضة', director: 'المديرة التربوية', teacher: 'مربية', parent: 'ولي أمر', staff: 'إدارية' };
+  const roleColors = { admin: 'badge-urgent', director: 'badge-received', teacher: 'badge-executed', parent: 'badge-normal', staff: 'badge-important' };
 %>
 
 <div class="page-actions">
@@ -75,6 +75,7 @@
           <option value="director">المديرة التربوية</option>
           <option value="teacher">مربية</option>
           <option value="parent">ولي أمر</option>
+          <option value="staff">إدارية (استقبال)</option>
           <option value="admin">مديرة الروضة (إدارة عامة)</option>
         </select>
       </div>

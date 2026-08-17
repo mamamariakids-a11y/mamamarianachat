@@ -32,23 +32,31 @@
         <div class="nav-section-title">الدروس والأنشطة</div>
         <a class="nav-link <%= currentPath === '/director' ? 'active' : '' %>" href="/director"><span class="icon"><i class="fa-solid fa-calendar-days"></i></span> التقويم التربوي</a>
         <a class="nav-link <%= currentPath === '/director/items/new' ? 'active' : '' %>" href="/director/items/new"><span class="icon"><i class="fa-solid fa-circle-plus"></i></span> إنشاء درس/نشاط</a>
+        <a class="nav-link <%= currentPath === '/director/notes' ? 'active' : '' %>" href="/director/notes"><span class="icon"><i class="fa-solid fa-note-sticky"></i></span> ملاحظات الأولياء</a>
       <% } %>
 
       <% if (user && user.role === 'director') { %>
         <div class="nav-section-title">الدروس والأنشطة</div>
         <a class="nav-link <%= currentPath === '/director' ? 'active' : '' %>" href="/director"><span class="icon"><i class="fa-solid fa-calendar-days"></i></span> التقويم التربوي</a>
         <a class="nav-link <%= currentPath === '/director/items/new' ? 'active' : '' %>" href="/director/items/new"><span class="icon"><i class="fa-solid fa-circle-plus"></i></span> إنشاء درس/نشاط</a>
+        <a class="nav-link <%= currentPath === '/director/notes' ? 'active' : '' %>" href="/director/notes"><span class="icon"><i class="fa-solid fa-note-sticky"></i></span> ملاحظات الأولياء</a>
       <% } %>
 
       <% if (user && user.role === 'teacher') { %>
         <div class="nav-section-title">مربيتي</div>
         <a class="nav-link <%= currentPath === '/teacher' ? 'active' : '' %>" href="/teacher"><span class="icon"><i class="fa-solid fa-calendar-week"></i></span> جدولي الأسبوعي</a>
         <a class="nav-link <%= currentPath === '/teacher/attendance' ? 'active' : '' %>" href="/teacher/attendance"><span class="icon"><i class="fa-solid fa-clipboard-check"></i></span> الحضور والغياب</a>
+        <a class="nav-link <%= currentPath === '/teacher/notes' ? 'active' : '' %>" href="/teacher/notes"><span class="icon"><i class="fa-solid fa-note-sticky"></i></span> ملاحظات الأولياء</a>
       <% } %>
 
       <% if (user && user.role === 'parent') { %>
         <div class="nav-section-title">متابعة طفلي</div>
         <a class="nav-link <%= currentPath === '/parent' ? 'active' : '' %>" href="/parent"><span class="icon"><i class="fa-solid fa-heart"></i></span> أنشطة طفلي</a>
+      <% } %>
+
+      <% if (user && user.role === 'staff') { %>
+        <div class="nav-section-title">الاستقبال</div>
+        <a class="nav-link <%= currentPath === '/staff' ? 'active' : '' %>" href="/staff"><span class="icon"><i class="fa-solid fa-note-sticky"></i></span> ملاحظات الأولياء</a>
       <% } %>
 
       <div class="nav-section-title">عام</div>
@@ -86,7 +94,7 @@
             <div class="u-name"><%= user ? user.name : '' %></div>
             <div class="u-role">
               <%
-                const roleLabels = { admin: 'مديرة الروضة', director: 'المديرة التربوية', teacher: 'مربية', parent: 'ولي أمر' };
+                const roleLabels = { admin: 'مديرة الروضة', director: 'المديرة التربوية', teacher: 'مربية', parent: 'ولي أمر', staff: 'إدارية' };
               %>
               <%= user ? roleLabels[user.role] : '' %>
             </div>

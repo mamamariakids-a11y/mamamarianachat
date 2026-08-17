@@ -277,4 +277,44 @@ router.post('/items/:id/delete', async (req, res, next) => {
   }
 });
 
+// ---------- Parent notes (read-only overview across all classes) ----------
+const NOTE_CATEGORY_LABELS = { health: '💊 صحة/دواء', food: '🍽️ طعام', transport: '🚌 نقل', other: '📝 أخرى' };
+
+router.get('/notes', async (req, res, next) => {
+  try {
+    const showAll = req.query.all === '1';
+    const today = dayjs().format('YYYY-MM-DD');
+    const result = await db.execute({
+      sql: `SELECT parent_notes.*, children.name AS child_name, classes.name AS class_name, classes.color AS class_color,
+                   creator.name AS created_by_name, doer.name AS done_by_name
+            FROM parent_notes
+            JOIN children ON children.id = parent_notes.child_id
+            JOIN classes ON classes.id = parent_notes.class_id
+            LEFT JOIN users creator ON creator.id = parent_notes.created_by
+            LEFT JOIN users doer ON doer.id = parent_notes.done_by
+            WHERE (? = 1 OR (parent_notes.archived = 0 AND (parent_notes.note_type = 'permanent' OR parent_notes.note_date = ?)))
+            ORDER BY parent_notes.created_at DESC`,
+      args: [showAll ? 1 : 0, today],
+    });
+
+    res.render('director/notes', {
+      title: 'ملاحظات وتوصيات الأولياء',
+      notes: result.rows,
+      categoryLabels: NOTE_CATEGORY_LABELS,
+      showAll,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/notes/:id/delete', async (req, res, next) => {
+  try {
+    await db.execute({ sql: 'UPDATE parent_notes SET archived = 1 WHERE id = ?', args: [req.params.id] });
+    res.redirect('/director/notes');
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -64,6 +64,15 @@ async function seedIfEmpty(db) {
     avatar_color: '#7A5CB6',
   });
 
+  await insertUser({
+    name: 'إدارية الاستقبال',
+    email: 'staff1@mamamaria.test',
+    password_hash: hash('Staff@123'),
+    role: 'staff',
+    phone: '0505555555',
+    avatar_color: '#D9634F',
+  });
+
   const insertClass = (c) =>
     db.execute({
       sql: `INSERT INTO classes (name, age_range, teacher_id, color) VALUES (@name, @age_range, @teacher_id, @color)`,

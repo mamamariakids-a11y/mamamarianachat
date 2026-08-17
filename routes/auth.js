@@ -9,6 +9,7 @@ const ROLE_HOME = {
   director: '/director',
   teacher: '/teacher',
   parent: '/parent',
+  staff: '/staff',
 };
 
 router.get('/login', (req, res) => {

@@ -48,6 +48,7 @@ app.get('/', (req, res) => {
     director: '/director',
     teacher: '/teacher',
     parent: '/parent',
+    staff: '/staff',
   };
   res.redirect(roleHome[req.session.user.role] || '/login');
 });
@@ -59,6 +60,7 @@ app.use('/director', require('./routes/director'));
 app.use('/teacher', require('./routes/teacher'));
 app.use('/admin', require('./routes/admin'));
 app.use('/parent', require('./routes/parent'));
+app.use('/staff', require('./routes/staff'));
 
 app.use((req, res) => {
   res.status(404).render('error', {

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin','director','teacher','parent')),
+  role TEXT NOT NULL CHECK (role IN ('admin','director','teacher','parent','staff')),
   phone TEXT,
   avatar_color TEXT DEFAULT '#5B8DEF',
   active INTEGER NOT NULL DEFAULT 1,
@@ -73,6 +73,27 @@ CREATE TABLE IF NOT EXISTS attendance (
   UNIQUE(child_id, date)
 );
 
+-- Notes/instructions from parents (relayed by front-desk staff) about a child:
+-- e.g. "give medicine at noon", "allergic to nuts", "leaves by the school bus
+-- today". 'daily' notes only matter on their note_date; 'permanent' notes stay
+-- visible until archived (e.g. a standing allergy).
+CREATE TABLE IF NOT EXISTS parent_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  note_type TEXT NOT NULL CHECK (note_type IN ('daily','permanent')),
+  category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('health','food','transport','other')),
+  content TEXT NOT NULL,
+  note_date TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','done')),
+  created_by INTEGER REFERENCES users(id),
+  done_by INTEGER REFERENCES users(id),
+  done_at TEXT,
+  done_note TEXT,
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -90,3 +111,6 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_r
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
 CREATE INDEX IF NOT EXISTS idx_attendance_class_date ON attendance(class_id, date);
 CREATE INDEX IF NOT EXISTS idx_attendance_child ON attendance(child_id);
+CREATE INDEX IF NOT EXISTS idx_notes_class ON parent_notes(class_id, archived);
+CREATE INDEX IF NOT EXISTS idx_notes_child ON parent_notes(child_id);
+CREATE INDEX IF NOT EXISTS idx_notes_date ON parent_notes(note_date);
